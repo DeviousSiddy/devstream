@@ -643,8 +643,9 @@
         });
         session = await res.json();
         
-        // If this was the last game, finish the session
-        if (session.currentGameIndex >= session.games.length - 1) {
+        // If all games have a result, finish the session
+        const allDone = session.games.every(g => g.result);
+        if (allDone) {
           await finishSession();
         } else {
           updateStatus();
@@ -696,7 +697,7 @@
               <div class="game-platform">${game.platform || ''}</div>
             </div>
             ${resultText ? `<span class="game-result ${resultClass}">${resultText}</span>` : ''}
-            ${game.duration ? `<span style="color: #aaa; font-size: 12px;">${formatDuration(game.duration)}</span>` : ''}
+            ${game.duration != null ? `<span style="color: #aaa; font-size: 12px;">${formatDuration(game.duration)}</span>` : ''}
             <button class="btn btn-sm btn-stop" onclick="removeGame('${game.id}')">X</button>
           </li>
         `;

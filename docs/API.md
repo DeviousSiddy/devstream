@@ -141,6 +141,18 @@ Returns current state including timer calculations.
 
 ---
 
+### Duplicate Overlay
+
+```http
+POST /api/text/:id/duplicate
+```
+
+Creates a copy with an auto-incremented name (e.g., "My Overlay" -> "My Overlay 2"). Sets `isActive: false` and `startedAt: null` on the copy.
+
+**Response:** New overlay object
+
+---
+
 ## Scrolling Text API
 
 ### Create Overlay
@@ -280,6 +292,18 @@ GET /api/scroll/:id/state
 Returns current state.
 
 **Response:** Overlay object with current state
+
+---
+
+### Duplicate Overlay
+
+```http
+POST /api/scroll/:id/duplicate
+```
+
+Creates a copy with an auto-incremented name (e.g., "My Scroll" -> "My Scroll 2"). Sets `isActive: false` and `startedAt: null` on the copy.
+
+**Response:** New overlay object
 
 ---
 
@@ -456,7 +480,19 @@ Sets `isActive: true` and `startedAt: Date.now()`
 POST /api/godgamer/sessions/:id/stop
 ```
 
-Sets `isActive: false` and `endedAt: Date.now()`
+Sets `isActive: false` and `endedAt: Date.now()`. Session data remains but overlay is hidden.
+
+**Response:** Updated session object
+
+---
+
+### Finish Session
+
+```http
+POST /api/godgamer/sessions/:id/finish
+```
+
+Freezes timers by setting `isFinished: true` and `endedAt: Date.now()`. Also freezes the current game's timer if it was running. Unlike stop, the overlay remains visible with frozen times.
 
 **Response:** Updated session object
 
@@ -532,6 +568,18 @@ GET /api/godgamer/sessions/:id/state
 
 ---
 
+### Duplicate Session
+
+```http
+POST /api/godgamer/sessions/:id/duplicate
+```
+
+Creates a copy with an auto-incremented name (e.g., "God Gamer Session" -> "God Gamer Session 2"). Resets games (clears results/timing), `currentGameIndex: 0`, `isActive: false`, `isFinished: false`.
+
+**Response:** New session object
+
+---
+
 ## Output Endpoints
 
 ### Output Page (OBS Browser Source)
@@ -572,7 +620,7 @@ Returns console HTML page for managing overlays.
 GET /console/render
 ```
 
-Returns JSON with `textRows` and `scrollRows` for auto-refresh.
+Returns JSON with `textRows`, `scrollRows`, and `godgamerSessions` for auto-refresh.
 
 ---
 

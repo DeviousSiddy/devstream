@@ -4,6 +4,16 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { load, save } = require('../store');
 
+function getNextIterationName(baseName, existingNames) {
+  const base = baseName.replace(/\s*\(\d+\)$/, '').replace(/\s+\d+$/, '').trim();
+  let maxNum = 1;
+  existingNames.forEach(name => {
+    const match = name.match(new RegExp('^' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' (\\d+)$'));
+    if (match) maxNum = Math.max(maxNum, parseInt(match[1]));
+  });
+  return base + ' ' + (maxNum + 1);
+}
+
 const TGDB_API_KEY = process.env.TGDB_API_KEY;
 const TGDB_BASE = 'https://api.thegamesdb.net/v1';
 
@@ -271,6 +281,7 @@ router.post('/sessions/:id/finish', (req, res) => {
   }
 
   session.isFinished = true;
+  session.endedAt = Date.now();
   save('godgamer-sessions', sessions);
   res.json(session);
 });
@@ -361,11 +372,16 @@ router.post('/sessions/:id/games/current/end', (req, res) => {
   const game = session.games[session.currentGameIndex];
   if (!game) return res.status(400).json({ error: 'No current game' });
 
-  game.endedAt = Date.now();
-  game.result = req.body.result || 'win'; // 'win' or 'loss'
-  if (game.startedAt) {
-    game.duration = Math.floor((game.endedAt - game.startedAt) / 1000);
+  const now = Date.now();
+  
+  // Calculate duration from session start if game didn't have its own startedAt
+  if (!game.startedAt) {
+    game.startedAt = session.startedAt || now;
   }
+  
+  game.endedAt = now;
+  game.result = req.body.result || 'win'; // 'win' or 'loss'
+  game.duration = Math.floor((game.endedAt - game.startedAt) / 1000);
 
   // Update game play count in database
   const dbGame = games.find(g => g.tgdbId === game.tgdbId || (game.steamId && g.steamId === game.steamId));
@@ -443,7 +459,7 @@ router.post('/sessions/:id/duplicate', (req, res) => {
   const newSession = {
     ...session,
     id: uuidv4(),
-    name: session.name + ' (Copy)',
+    name: getNextIterationName(session.name, sessions.map(s => s.name)),
     games: session.games.map(g => ({ ...g, id: uuidv4(), result: null, startedAt: null, endedAt: null, duration: null })),
     currentGameIndex: 0,
     isActive: false,

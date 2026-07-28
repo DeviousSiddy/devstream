@@ -109,7 +109,7 @@ function renderOverlays() {
     }).join('');
 
     const sessionTimerHtml = session.startedAt
-      ? `<div class="godgamer-session-timer" data-started="${session.startedAt}" data-finished="${session.isFinished ? 'true' : 'false'}"></div>`
+      ? `<div class="godgamer-session-timer" data-started="${session.startedAt}" data-finished="${session.isFinished ? 'true' : 'false'}" data-ended-at="${session.endedAt || ''}"></div>`
       : '';
 
     return `
@@ -264,8 +264,7 @@ router.get('/output', (req, res) => {
         if (!started) { timer.textContent = ''; return; }
         
         if (isFinished) {
-          // Show final frozen time
-          const endedAt = timer.dataset.endedAt ? parseInt(timer.dataset.endedAt) : Date.now();
+          const endedAt = parseInt(timer.dataset.endedAt) || Date.now();
           const elapsed = Math.floor((endedAt - started) / 1000);
           const mins = Math.floor(elapsed / 60);
           const secs = elapsed % 60;

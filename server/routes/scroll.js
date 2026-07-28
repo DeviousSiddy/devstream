@@ -3,6 +3,16 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { load, save } = require('../store');
 
+function getNextIterationName(baseName, existingNames) {
+  const base = baseName.replace(/\s*\(\d+\)$/, '').replace(/\s+\d+$/, '').trim();
+  let maxNum = 1;
+  existingNames.forEach(name => {
+    const match = name.match(new RegExp('^' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' (\\d+)$'));
+    if (match) maxNum = Math.max(maxNum, parseInt(match[1]));
+  });
+  return base + ' ' + (maxNum + 1);
+}
+
 router.post('/create', (req, res) => {
   const overlays = load('scroll-overlays');
   const newOverlay = {
@@ -95,7 +105,7 @@ router.post('/:id/duplicate', (req, res) => {
   const newOverlay = {
     ...overlay,
     id: uuidv4(),
-    name: overlay.name + ' (Copy)',
+    name: getNextIterationName(overlay.name, overlays.map(o => o.name)),
     isActive: false,
     startedAt: null
   };

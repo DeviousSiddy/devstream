@@ -65,6 +65,7 @@ All modules share these features:
 | POST | /api/text/:id/start | Start countdown |
 | POST | /api/text/:id/stop | Stop/reset overlay |
 | GET | /api/text/:id/state | Get current state |
+| POST | /api/text/:id/duplicate | Duplicate overlay (numbered name) |
 
 ### Timer Implementation
 - Server stores `startedAt` timestamp when starting
@@ -123,6 +124,7 @@ All modules share these features:
 | POST | /api/scroll/:id/start | Start scrolling |
 | POST | /api/scroll/:id/stop | Stop scrolling |
 | GET | /api/scroll/:id/state | Get current state |
+| POST | /api/scroll/:id/duplicate | Duplicate overlay (numbered name) |
 
 ### Scroll Implementation
 - Client-side animation using `requestAnimationFrame`
@@ -142,15 +144,20 @@ All modules share these features:
 
 ### Features
 - Track gaming challenge sessions with game cap
-- Game search via TheGamesDB (TGDB) API
+- Dual search: "Search Local" (fast, no API) and "Search TGDB" (full API)
+- Manual game entry via JSON textarea for uncatalogued games
 - Local game database for quick search (saves API calls)
 - Boxart/title screen images from TGDB
+- Configurable icon size (16-128px) for boxart on overlay
 - Player management (defaults to devioussiddy)
 - Session history with game results (win/loss)
-- Duration tracking for sessions and games
+- Duration tracking for sessions and individual games
 - Numbered game list with icons on output overlay
-- Session timer on output overlay
+- Session timer on output overlay (freezes on finish)
 - Current game pointer with visual indicator
+- Finish Session: freezes timers, keeps overlay visible (`isFinished: true`)
+- Stop Session: ends session, hides overlay (`isActive: false`)
+- Duplicate sessions with auto-incremented names
 
 ### Settings
 
@@ -168,6 +175,7 @@ All modules share these features:
 | outlineColor | string | "#000000" | Outline color |
 | outlineWidth | number | 2 | Outline width in pixels |
 | customCSS | string | "" | Custom CSS injection |
+| iconSize | number | 32 | Boxart icon size in pixels (16-128) |
 
 ### Data Models
 
@@ -240,7 +248,9 @@ All modules share these features:
 | PUT | /api/godgamer/sessions/:id | Update session settings |
 | DELETE | /api/godgamer/sessions/:id | Delete session |
 | POST | /api/godgamer/sessions/:id/start | Start session timer |
-| POST | /api/godgamer/sessions/:id/stop | Stop session |
+| POST | /api/godgamer/sessions/:id/stop | Stop session (hide overlay) |
+| POST | /api/godgamer/sessions/:id/finish | Finish session (freeze timers, keep visible) |
+| POST | /api/godgamer/sessions/:id/duplicate | Duplicate session (numbered name) |
 | POST | /api/godgamer/sessions/:id/games | Add game to session |
 | DELETE | /api/godgamer/sessions/:id/games/:gameId | Remove game from session |
 | POST | /api/godgamer/sessions/:id/games/current/start | Start current game |
