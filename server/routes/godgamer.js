@@ -20,7 +20,7 @@ router.get('/search', async (req, res) => {
     const { q } = req.query;
     if (!q) return res.status(400).json({ error: 'Query required' });
 
-    const url = `${TGDB_BASE}/Games?apikey=${TGDB_API_KEY}&name=${encodeURIComponent(q)}&include=boxart`;
+    const url = `${TGDB_BASE}/Games/ByGameName?apikey=${TGDB_API_KEY}&name=${encodeURIComponent(q)}&include=boxart`;
     const response = await fetch(url);
     const data = await response.json();
 
@@ -29,16 +29,44 @@ router.get('/search', async (req, res) => {
     }
 
     const games = data.data.games.map(g => {
-      const boxart = g.game_art?.find(a => a.type === 'boxart') || g.boxart;
+      // Boxart is in include.boxart.data[gameId]
+      let boxartUrl = null;
+      if (data.include && data.include.boxart && data.include.boxart.data) {
+        const gameBoxart = data.include.boxart.data[g.id];
+        if (gameBoxart && gameBoxart.length > 0) {
+          const baseUrl = data.include.boxart.base_url?.medium || 'https://cdn.thegamesdb.net/images/medium/';
+          boxartUrl = baseUrl + gameBoxart[0].filename;
+        }
+      }
+      
+      // Platform ID to name mapping
+      const platforms = {
+        1: 'PC', 3: 'Xbox', 4: 'Mac', 5: 'Mac', 6: 'Commodore 64',
+        7: 'Amiga', 8: 'Atari ST', 9: 'Amstrad CPC', 11: 'ZX Spectrum',
+        12: 'MSX', 13: 'ColecoVision', 14: 'Intellivision', 15: 'Vectrex',
+        16: 'Magnavox Odyssey', 17: 'Nintendo GameBoy', 18: 'Nintendo NES',
+        19: 'Nintendo SNES', 20: 'Nintendo 64', 21: 'GameCube', 22: 'Nintendo DS',
+        23: 'Nintendo Wii', 24: 'Nintendo Wii U', 25: 'Nintendo Switch',
+        26: 'Nintendo 3DS', 27: 'Game Boy Advance', 28: 'Nintendo GameBoy Color',
+        29: 'Xbox 360', 30: 'Xbox', 31: 'Xbox One', 32: 'Xbox Series',
+        33: 'PlayStation', 34: 'PlayStation 2', 35: 'PlayStation 3',
+        36: 'PlayStation 4', 37: 'PlayStation 5', 38: 'PSP',
+        39: 'PS Vita', 41: 'GameGear', 42: 'Neo Geo', 43: 'TurboGrafx-16',
+        44: 'Sega Master System', 45: 'Sega Genesis', 46: 'Sega CD',
+        47: 'Sega 32X', 48: 'Sega Saturn', 49: 'Sega Dreamcast',
+        50: 'Sega Game Gear', 51: 'Sega Game Gear',
+        4915: 'Linux', 4916: 'Android', 4917: 'iOS',
+        4918: 'Windows Phone', 4919: 'PlayStation Network',
+        4920: 'Xbox Live Arcade', 4921: 'Virtual Console',
+        4922: 'Steam', 4923: 'GOG', 4924: 'Epic Games Store',
+        4971: 'Xbox One', 4972: 'PlayStation 4'
+      };
+
       return {
         tgdbId: g.id,
         name: g.game_title,
-        platform: g.platform_name || g.platform,
-        releaseDate: g.release_date,
-        overview: g.overview?.substring(0, 200),
-        boxartUrl: g.boxart?.filename
-          ? `https://cdn.thegamesdb.net/images/medium/${g.boxart.filename}`
-          : (boxart?.filename ? `https://cdn.thegamesdb.net/images/medium/${boxart.filename}` : null)
+        platform: platforms[g.platform] || `Platform ${g.platform}`,
+        boxartUrl: boxartUrl
       };
     });
 
@@ -52,7 +80,7 @@ router.get('/search', async (req, res) => {
 // Get game details from TGDB
 router.get('/game/:tgdbId', async (req, res) => {
   try {
-    const url = `${TGDB_BASE}/Games/ByGameID?apikey=${TGDB_API_KEY}&id=${req.params.tgdbId}&include=boxart,steam`;
+    const url = `${TGDB_BASE}/Games/ByGameID?apikey=${TGDB_API_KEY}&id=${req.params.tgdbId}&include=boxart`;
     const response = await fetch(url);
     const data = await response.json();
 
@@ -61,14 +89,46 @@ router.get('/game/:tgdbId', async (req, res) => {
     }
 
     const g = data.data.games[0];
+    
+    // Extract boxart from include
+    let boxartUrl = null;
+    if (data.include && data.include.boxart && data.include.boxart.data) {
+      const gameBoxart = data.include.boxart.data[g.id];
+      if (gameBoxart && gameBoxart.length > 0) {
+        const baseUrl = data.include.boxart.base_url?.medium || 'https://cdn.thegamesdb.net/images/medium/';
+        boxartUrl = baseUrl + gameBoxart[0].filename;
+      }
+    }
+
+    // Platform mapping
+    const platforms = {
+      1: 'PC', 3: 'Xbox', 4: 'Mac', 5: 'Mac', 6: 'Commodore 64',
+      7: 'Amiga', 8: 'Atari ST', 9: 'Amstrad CPC', 11: 'ZX Spectrum',
+      12: 'MSX', 13: 'ColecoVision', 14: 'Intellivision', 15: 'Vectrex',
+      16: 'Magnavox Odyssey', 17: 'Nintendo GameBoy', 18: 'Nintendo NES',
+      19: 'Nintendo SNES', 20: 'Nintendo 64', 21: 'GameCube', 22: 'Nintendo DS',
+      23: 'Nintendo Wii', 24: 'Nintendo Wii U', 25: 'Nintendo Switch',
+      26: 'Nintendo 3DS', 27: 'Game Boy Advance', 28: 'Nintendo GameBoy Color',
+      29: 'Xbox 360', 30: 'Xbox', 31: 'Xbox One', 32: 'Xbox Series',
+      33: 'PlayStation', 34: 'PlayStation 2', 35: 'PlayStation 3',
+      36: 'PlayStation 4', 37: 'PlayStation 5', 38: 'PSP',
+      39: 'PS Vita', 41: 'GameGear', 42: 'Neo Geo', 43: 'TurboGrafx-16',
+      44: 'Sega Master System', 45: 'Sega Genesis', 46: 'Sega CD',
+      47: 'Sega 32X', 48: 'Sega Saturn', 49: 'Sega Dreamcast',
+      50: 'Sega Game Gear', 51: 'Sega Game Gear',
+      4915: 'Linux', 4916: 'Android', 4917: 'iOS',
+      4918: 'Windows Phone', 4919: 'PlayStation Network',
+      4920: 'Xbox Live Arcade', 4921: 'Virtual Console',
+      4922: 'Steam', 4923: 'GOG', 4924: 'Epic Games Store',
+      4971: 'Xbox One', 4972: 'PlayStation 4'
+    };
+
     const game = {
       tgdbId: g.id,
       name: g.game_title,
-      platform: g.platform_name || g.platform,
+      platform: platforms[g.platform] || `Platform ${g.platform}`,
       steamId: g.steam_id || null,
-      boxartUrl: g.boxart?.filename
-        ? `https://cdn.thegamesdb.net/images/medium/${g.boxart.filename}`
-        : null,
+      boxartUrl: boxartUrl,
       overview: g.overview
     };
 
