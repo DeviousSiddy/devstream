@@ -56,12 +56,44 @@ function renderScrollRow(overlay) {
   `;
 }
 
+function renderGodgamerRow(session) {
+  let status = 'Inactive';
+  let statusClass = '';
+  if (session.isActive) {
+    status = 'Active';
+    statusClass = 'status-active';
+  } else if (session.endedAt) {
+    status = 'Completed';
+    statusClass = 'status-expired';
+  }
+
+  const gamesPlayed = (session.games || []).filter(g => g.result).length;
+  const totalGames = (session.games || []).length;
+  const players = (session.playerNames || []).join(', ') || 'devioussiddy';
+
+  return `
+    <tr>
+      <td>${session.name}</td>
+      <td>${players}</td>
+      <td>${gamesPlayed}/${totalGames}</td>
+      <td class="${statusClass}">${status}</td>
+      <td>
+        <a href="/godgamer-display?id=${session.id}">Settings</a>
+        <button class="btn btn-sm" onclick="toggleGodgamerSession('${session.id}', ${!session.isActive})">${session.isActive ? 'Stop' : 'Start'}</button>
+        <button class="btn btn-sm btn-stop" onclick="deleteGodgamerSession('${session.id}', '${session.name}')">Delete</button>
+      </td>
+    </tr>
+  `;
+}
+
 function renderConsole() {
   const textOverlays = load('text-overlays');
   const scrollOverlays = load('scroll-overlays');
+  const godgamerSessions = load('godgamer-sessions');
   
   const textRows = textOverlays.map(renderTextRow).join('');
   const scrollRows = scrollOverlays.map(renderScrollRow).join('');
+  const godgamerRows = godgamerSessions.map(renderGodgamerRow).join('');
 
   return `<!DOCTYPE html>
 <html>
@@ -119,6 +151,7 @@ function renderConsole() {
     <h3>Choose Module Type</h3>
     <a href="/text-display" class="module-option">Text Display</a>
     <a href="/scroll-display" class="module-option">Scrolling Text</a>
+    <a href="/godgamer-display" class="module-option">God Gamer Challenge</a>
     <button class="btn btn-stop" onclick="hideModulePicker()" style="margin-left: 10px;">Cancel</button>
   </div>
 
@@ -142,6 +175,18 @@ function renderConsole() {
       </thead>
       <tbody id="scrollTable">
         ${scrollRows || '<tr><td colspan="4">No overlays yet</td></tr>'}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>God Gamer Sessions</h2>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Players</th><th>Games</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="godgamerTable">
+        ${godgamerRows || '<tr><td colspan="5">No sessions yet</td></tr>'}
       </tbody>
     </table>
   </div>
@@ -183,12 +228,27 @@ function renderConsole() {
       refreshConsole();
     }
 
+    async function toggleGodgamerSession(id, activate) {
+      const endpoint = activate 
+        ? '/api/godgamer/sessions/' + id + '/start'
+        : '/api/godgamer/sessions/' + id + '/stop';
+      await fetch(endpoint, { method: 'POST' });
+      refreshConsole();
+    }
+
+    async function deleteGodgamerSession(id, name) {
+      if (!confirm('Delete "' + name + '"?')) return;
+      await fetch('/api/godgamer/sessions/' + id, { method: 'DELETE' });
+      refreshConsole();
+    }
+
     async function refreshConsole() {
       try {
         const res = await fetch('/console/render');
         const data = await res.json();
         document.getElementById('textTable').innerHTML = data.textRows || '<tr><td colspan="4">No overlays yet</td></tr>';
         document.getElementById('scrollTable').innerHTML = data.scrollRows || '<tr><td colspan="4">No overlays yet</td></tr>';
+        document.getElementById('godgamerTable').innerHTML = data.godgamerRows || '<tr><td colspan="5">No sessions yet</td></tr>';
       } catch (e) {}
     }
 
@@ -205,11 +265,13 @@ router.get('/console', (req, res) => {
 router.get('/console/render', (req, res) => {
   const textOverlays = load('text-overlays');
   const scrollOverlays = load('scroll-overlays');
+  const godgamerSessions = load('godgamer-sessions');
   
   const textRows = textOverlays.map(renderTextRow).join('');
   const scrollRows = scrollOverlays.map(renderScrollRow).join('');
+  const godgamerRows = godgamerSessions.map(renderGodgamerRow).join('');
   
-  res.json({ textRows, scrollRows });
+  res.json({ textRows, scrollRows, godgamerRows });
 });
 
 module.exports = router;

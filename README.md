@@ -40,6 +40,19 @@ Multiline text that scrolls right to left:
 - Opacity control
 - Custom CSS injection
 
+### God Gamer Challenge
+
+Track gaming challenge sessions:
+- Game search via TheGamesDB (TGDB) API
+- Local game database for quick search
+- Boxart/title screen images from TGDB
+- Player management
+- Session history with game results (win/loss)
+- Duration tracking for sessions and games
+- Numbered game list with icons on output
+- Session timer on output
+- Current game pointer with visual indicator
+
 ## Quick Start
 
 ### Using Docker Compose
@@ -69,6 +82,7 @@ npm start
 | Console | `/console` | Main control panel for managing overlays |
 | Text Settings | `/text-display?id=<id>` | Configure text display overlay |
 | Scroll Settings | `/scroll-display?id=<id>` | Configure scrolling text overlay |
+| God Gamer Settings | `/godgamer-display?id=<id>` | Configure God Gamer session |
 | Output | `/output` | Browser source URL for OBS |
 | Debug | `/debug` | Debug and testing interface |
 
@@ -77,6 +91,7 @@ npm start
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | Server port |
+| `TGDB_API_KEY` | - | TheGamesDB API key (required for game search) |
 
 ## OBS Setup
 
@@ -109,6 +124,17 @@ PUT /api/scroll/:id        # Update overlay
 DELETE /api/scroll/:id     # Delete overlay
 GET /api/scroll/:id        # Get overlay
 GET /api/scroll            # Get all overlays
+
+# God Gamer Challenge API
+GET /api/godgamer/search?q=        # Search games on TGDB
+GET /api/godgamer/games            # List local game database
+GET /api/godgamer/players          # List players
+POST /api/godgamer/sessions        # Create session
+POST /api/godgamer/sessions/:id/start  # Start session
+POST /api/godgamer/sessions/:id/stop   # Stop session
+POST /api/godgamer/sessions/:id/games  # Add game to session
+POST /api/godgamer/sessions/:id/games/current/start  # Start current game
+POST /api/godgamer/sessions/:id/games/current/end    # End current game (win/loss)
 ```
 
 ## Project Structure
@@ -118,6 +144,7 @@ devstream/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── package.json
+├── .env                    # Environment variables (gitignored)
 ├── data/                   # Runtime data (gitignored)
 ├── docs/                   # Documentation
 │   ├── API.md
@@ -125,13 +152,15 @@ devstream/
 │   └── MODULES.md
 ├── public/
 │   ├── text-display.html   # Text settings page
-│   └── scroll-display.html # Scroll settings page
+│   ├── scroll-display.html # Scroll settings page
+│   └── godgamer-display.html # God Gamer settings page
 └── server/
     ├── index.js            # Express server
     ├── store.js            # JSON file persistence
     └── routes/
         ├── api.js          # Text API endpoints
         ├── scroll.js       # Scroll API endpoints
+        ├── godgamer.js     # God Gamer API endpoints
         ├── console.js      # Console page
         ├── debug.js        # Debug interface
         └── output.js       # OBS output

@@ -135,39 +135,62 @@ All modules share these features:
 
 ## God Gamer Challenge
 
-**Status:** Planned  
+**Status:** Complete  
+**Settings:** `/godgamer-display`  
+**API:** `/api/godgamer/*`  
 **Complexity:** High
 
 ### Features
-- Track gaming challenge sessions
-- Timer with start/stop
-- Player management
-- Game logging with win/loss
-- Session history and stats
-- Cap-based challenge (default: 10 games)
+- Track gaming challenge sessions with game cap
+- Game search via TheGamesDB (TGDB) API
+- Local game database for quick search (saves API calls)
+- Boxart/title screen images from TGDB
+- Player management (defaults to devioussiddy)
+- Session history with game results (win/loss)
+- Duration tracking for sessions and games
+- Numbered game list with icons on output overlay
+- Session timer on output overlay
+- Current game pointer with visual indicator
 
-### Settings (Planned)
+### Settings
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
+| name | string | "God Gamer Session" | Session display name |
 | cap | number | 10 | Max games per session |
-| timerFormat | string | "MM:SS" | Timer display format |
-| fontSize | number | 48 | Font size in pixels |
+| fontSize | number | 32 | Font size in pixels |
 | fontColor | string | "#ffffff" | Text color |
+| font | string | "Arial" | Font family |
 | backgroundColor | string | "transparent" | Background color |
 | position | object | {x: 100, y: 100} | X/Y coordinates |
 | opacity | number | 1 | Opacity (0-1) |
+| outlineEnabled | boolean | false | Enable text outline |
+| outlineColor | string | "#000000" | Outline color |
+| outlineWidth | number | 2 | Outline width in pixels |
 | customCSS | string | "" | Custom CSS injection |
 
-### Data Models (Planned)
+### Data Models
 
 **Player:**
 ```json
 {
   "id": "uuid",
-  "name": "Player Name",
-  "totalGames": 0,
-  "totalWins": 0
+  "name": "devioussiddy",
+  "createdAt": timestamp
+}
+```
+
+**Game (Database):**
+```json
+{
+  "id": "uuid",
+  "tgdbId": 12345,
+  "steamId": "76561198000000000",
+  "name": "Game Name",
+  "platform": "PC",
+  "boxartUrl": "https://cdn.thegamesdb.net/images/medium/...",
+  "playCount": 5,
+  "createdAt": timestamp
 }
 ```
 
@@ -175,38 +198,60 @@ All modules share these features:
 ```json
 {
   "id": "uuid",
-  "playerId": "uuid",
+  "playerIds": ["uuid1", "uuid2"],
+  "playerNames": ["devioussiddy", "player2"],
   "cap": 10,
-  "startedAt": "timestamp",
+  "games": [
+    {
+      "id": "uuid",
+      "tgdbId": 12345,
+      "name": "Game Name",
+      "platform": "PC",
+      "steamId": "76561198000000000",
+      "boxartUrl": "url",
+      "result": "win|loss",
+      "startedAt": timestamp,
+      "endedAt": timestamp,
+      "duration": 120
+    }
+  ],
+  "currentGameIndex": 0,
+  "isActive": false,
+  "startedAt": null,
   "endedAt": null,
-  "games": [],
-  "wins": 0,
-  "losses": 0
+  "createdAt": timestamp
 }
 ```
 
-**Game:**
-```json
-{
-  "id": "uuid",
-  "result": "win|loss",
-  "duration": 120,
-  "notes": "",
-  "playedAt": "timestamp"
-}
-```
-
-### API Endpoints (Planned)
+### API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | /api/godgamer/search?q= | Search games on TGDB |
+| GET | /api/godgamer/game/:tgdbId | Get game details from TGDB |
+| GET | /api/godgamer/games | List local game database |
+| DELETE | /api/godgamer/games/:id | Delete game from database |
 | GET | /api/godgamer/players | List players |
 | POST | /api/godgamer/players | Create player |
-| POST | /api/godgamer/sessions | Start session |
-| POST | /api/godgamer/sessions/:id/start | Start timer |
+| DELETE | /api/godgamer/players/:id | Delete player |
+| GET | /api/godgamer/sessions | List all sessions |
+| POST | /api/godgamer/sessions | Create new session |
+| GET | /api/godgamer/sessions/:id | Get session |
+| PUT | /api/godgamer/sessions/:id | Update session settings |
+| DELETE | /api/godgamer/sessions/:id | Delete session |
+| POST | /api/godgamer/sessions/:id/start | Start session timer |
 | POST | /api/godgamer/sessions/:id/stop | Stop session |
-| POST | /api/godgamer/sessions/:id/games | Log game result |
-| GET | /api/godgamer/sessions/:id | Get session stats |
+| POST | /api/godgamer/sessions/:id/games | Add game to session |
+| DELETE | /api/godgamer/sessions/:id/games/:gameId | Remove game from session |
+| POST | /api/godgamer/sessions/:id/games/current/start | Start current game |
+| POST | /api/godgamer/sessions/:id/games/current/end | End current game (win/loss) |
+| GET | /api/godgamer/sessions/:id/state | Get session state |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| TGDB_API_KEY | TheGamesDB API key (stored in .env) |
 
 ---
 

@@ -5,9 +5,11 @@ const { load } = require('../store');
 function renderOverlays() {
   const textOverlays = load('text-overlays');
   const scrollOverlays = load('scroll-overlays');
+  const godgamerSessions = load('godgamer-sessions');
   
   const activeTextOverlays = textOverlays.filter(o => o.isActive);
   const activeScrollOverlays = scrollOverlays.filter(o => o.isActive);
+  const activeGodgamer = godgamerSessions.filter(s => s.isActive);
 
   const textHtml = activeTextOverlays.map(overlay => {
     let timerOutlineStyle = '';
@@ -66,7 +68,71 @@ function renderOverlays() {
     `;
   }).join('');
 
-  return textHtml + scrollHtml;
+  const godgamerHtml = activeGodgamer.map(session => {
+    let outlineStyle = '';
+    if (session.outlineEnabled) {
+      const w = session.outlineWidth || 2;
+      const c = session.outlineColor || '#000000';
+      outlineStyle = `text-shadow: -${w}px -${w}px 0 ${c}, ${w}px -${w}px 0 ${c}, -${w}px ${w}px 0 ${c}, ${w}px ${w}px 0 ${c};`;
+    }
+
+    const games = (session.games || []).map((game, i) => {
+      let resultClass = '';
+      let resultText = '';
+      
+      if (game.result === 'win') {
+        resultClass = 'godgamer-win';
+        resultText = 'W';
+      } else if (game.result === 'loss') {
+        resultClass = 'godgamer-loss';
+        resultText = 'L';
+      } else if (i === session.currentGameIndex && session.isActive) {
+        resultClass = 'godgamer-current';
+        resultText = '';
+      }
+
+      const durationText = game.duration ? formatDuration(game.duration) : '';
+      const imgHtml = game.boxartUrl
+        ? `<img class="godgamer-icon" src="${game.boxartUrl}" alt="" onerror="this.style.display='none'">`
+        : `<div class="godgamer-icon-placeholder"></div>`;
+
+      return `
+        <div class="godgamer-game ${resultClass}">
+          <span class="godgamer-number">${i + 1}.</span>
+          ${imgHtml}
+          <span class="godgamer-name">${game.name}</span>
+          ${resultText ? `<span class="godgamer-result ${resultClass}">${resultText}</span>` : ''}
+          ${durationText ? `<span class="godgamer-duration">${durationText}</span>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    const sessionTimerHtml = session.startedAt
+      ? `<div class="godgamer-session-timer" data-started="${session.startedAt}"></div>`
+      : '';
+
+    return `
+      <div class="godgamer-overlay" id="godgamer-${session.id}"
+        style="left:${session.position.x}px; top:${session.position.y}px; opacity:${session.opacity ?? 1}; background-color:${session.backgroundColor || 'transparent'};">
+        <div class="godgamer-header" style="font-size:${session.fontSize}px; color:${session.fontColor}; font-family:${session.font}; ${outlineStyle}">
+          ${session.name}
+          ${sessionTimerHtml}
+        </div>
+        <div class="godgamer-games" style="font-size:${Math.floor(session.fontSize * 0.7)}px; color:${session.fontColor}; font-family:${session.font}; ${outlineStyle}">
+          ${games}
+        </div>
+        <style>${session.customCSS || ''}</style>
+      </div>
+    `;
+  }).join('');
+
+  return textHtml + scrollHtml + godgamerHtml;
+}
+
+function formatDuration(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m + ':' + (s < 10 ? '0' : '') + s;
 }
 
 router.get('/output', (req, res) => {
@@ -94,6 +160,82 @@ router.get('/output', (req, res) => {
       display: inline-block;
       white-space: nowrap;
     }
+    .godgamer-overlay {
+      position: absolute;
+      min-width: 300px;
+    }
+    .godgamer-header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    .godgamer-session-timer {
+      font-size: 0.6em;
+      opacity: 0.8;
+    }
+    .godgamer-games {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .godgamer-game {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.3);
+    }
+    .godgamer-game.godgamer-current {
+      background: rgba(77, 166, 255, 0.3);
+      border: 1px solid rgba(77, 166, 255, 0.5);
+    }
+    .godgamer-game.godgamer-win {
+      background: rgba(77, 255, 77, 0.2);
+    }
+    .godgamer-game.godgamer-loss {
+      background: rgba(255, 77, 77, 0.2);
+    }
+    .godgamer-number {
+      font-weight: bold;
+      min-width: 25px;
+      opacity: 0.7;
+    }
+    .godgamer-icon {
+      width: 32px;
+      height: 32px;
+      object-fit: cover;
+      border-radius: 4px;
+    }
+    .godgamer-icon-placeholder {
+      width: 32px;
+      height: 32px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+    .godgamer-name {
+      flex: 1;
+    }
+    .godgamer-result {
+      font-weight: bold;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 0.8em;
+    }
+    .godgamer-result.godgamer-win {
+      background: rgba(77, 255, 77, 0.3);
+      color: #4dff4d;
+    }
+    .godgamer-result.godgamer-loss {
+      background: rgba(255, 77, 77, 0.3);
+      color: #ff4d4d;
+    }
+    .godgamer-duration {
+      font-size: 0.8em;
+      opacity: 0.7;
+    }
   </style>
 </head>
 <body>
@@ -112,6 +254,15 @@ router.get('/output', (req, res) => {
         }
         const mins = Math.floor(remaining / 60);
         const secs = Math.floor(remaining % 60);
+        timer.textContent = mins.toString().padStart(2, '0') + ':' + secs.toString().padStart(2, '0');
+      });
+
+      document.querySelectorAll('.godgamer-session-timer').forEach(timer => {
+        const started = parseInt(timer.dataset.started);
+        if (!started) { timer.textContent = ''; return; }
+        const elapsed = Math.floor((Date.now() - started) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
         timer.textContent = mins.toString().padStart(2, '0') + ':' + secs.toString().padStart(2, '0');
       });
     }
