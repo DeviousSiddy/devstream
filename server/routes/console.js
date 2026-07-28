@@ -25,6 +25,7 @@ function renderTextRow(overlay) {
       <td>
         <a href="/text-display?id=${overlay.id}">Settings</a>
         <button class="btn btn-sm" onclick="toggleTextOverlay('${overlay.id}', ${!overlay.isActive})">${overlay.isActive ? 'Stop' : 'Start'}</button>
+        <button class="btn btn-sm btn-secondary" onclick="duplicateTextOverlay('${overlay.id}')">Duplicate</button>
         <button class="btn btn-sm btn-stop" onclick="deleteTextOverlay('${overlay.id}', '${overlay.name}')">Delete</button>
       </td>
     </tr>
@@ -50,6 +51,7 @@ function renderScrollRow(overlay) {
       <td>
         <a href="/scroll-display?id=${overlay.id}">Settings</a>
         <button class="btn btn-sm" onclick="toggleScrollOverlay('${overlay.id}', ${!overlay.isActive})">${overlay.isActive ? 'Stop' : 'Start'}</button>
+        <button class="btn btn-sm btn-secondary" onclick="duplicateScrollOverlay('${overlay.id}')">Duplicate</button>
         <button class="btn btn-sm btn-stop" onclick="deleteScrollOverlay('${overlay.id}', '${overlay.name}')">Delete</button>
       </td>
     </tr>
@@ -59,7 +61,10 @@ function renderScrollRow(overlay) {
 function renderGodgamerRow(session) {
   let status = 'Inactive';
   let statusClass = '';
-  if (session.isActive) {
+  if (session.isFinished) {
+    status = 'Finished';
+    statusClass = 'status-expired';
+  } else if (session.isActive) {
     status = 'Active';
     statusClass = 'status-active';
   } else if (session.endedAt) {
@@ -80,6 +85,7 @@ function renderGodgamerRow(session) {
       <td>
         <a href="/godgamer-display?id=${session.id}">Settings</a>
         <button class="btn btn-sm" onclick="toggleGodgamerSession('${session.id}', ${!session.isActive})">${session.isActive ? 'Stop' : 'Start'}</button>
+        <button class="btn btn-sm btn-secondary" onclick="duplicateGodgamerSession('${session.id}')">Duplicate</button>
         <button class="btn btn-sm btn-stop" onclick="deleteGodgamerSession('${session.id}', '${session.name}')">Delete</button>
       </td>
     </tr>
@@ -115,6 +121,8 @@ function renderConsole() {
     }
     .btn-sm { padding: 4px 8px; font-size: 12px; }
     .btn-stop { background: #ff4d4d; }
+    .btn-secondary { background: #666; }
+    .btn-secondary:hover { background: #777; }
     .section { margin-bottom: 30px; }
     .overlay-size { 
       margin-bottom: 20px; padding: 15px; background: #2a2a2a; border-radius: 4px;
@@ -208,6 +216,12 @@ function renderConsole() {
       refreshConsole();
     }
 
+    async function duplicateTextOverlay(id) {
+      const res = await fetch('/api/text/' + id + '/duplicate', { method: 'POST' });
+      const newOverlay = await res.json();
+      window.location.href = '/text-display?id=' + newOverlay.id;
+    }
+
     async function deleteTextOverlay(id, name) {
       if (!confirm('Delete "' + name + '"?')) return;
       await fetch('/api/text/' + id, { method: 'DELETE' });
@@ -222,6 +236,12 @@ function renderConsole() {
       refreshConsole();
     }
 
+    async function duplicateScrollOverlay(id) {
+      const res = await fetch('/api/scroll/' + id + '/duplicate', { method: 'POST' });
+      const newOverlay = await res.json();
+      window.location.href = '/scroll-display?id=' + newOverlay.id;
+    }
+
     async function deleteScrollOverlay(id, name) {
       if (!confirm('Delete "' + name + '"?')) return;
       await fetch('/api/scroll/' + id, { method: 'DELETE' });
@@ -234,6 +254,12 @@ function renderConsole() {
         : '/api/godgamer/sessions/' + id + '/stop';
       await fetch(endpoint, { method: 'POST' });
       refreshConsole();
+    }
+
+    async function duplicateGodgamerSession(id) {
+      const res = await fetch('/api/godgamer/sessions/' + id + '/duplicate', { method: 'POST' });
+      const newSession = await res.json();
+      window.location.href = '/godgamer-display?id=' + newSession.id;
     }
 
     async function deleteGodgamerSession(id, name) {

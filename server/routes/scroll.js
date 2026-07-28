@@ -87,4 +87,21 @@ router.get('/:id', (req, res) => {
   res.json(overlay);
 });
 
+router.post('/:id/duplicate', (req, res) => {
+  const overlays = load('scroll-overlays');
+  const overlay = overlays.find(o => o.id === req.params.id);
+  if (!overlay) return res.status(404).json({ error: 'Not found' });
+  
+  const newOverlay = {
+    ...overlay,
+    id: uuidv4(),
+    name: overlay.name + ' (Copy)',
+    isActive: false,
+    startedAt: null
+  };
+  overlays.push(newOverlay);
+  save('scroll-overlays', overlays);
+  res.json(newOverlay);
+});
+
 module.exports = router;

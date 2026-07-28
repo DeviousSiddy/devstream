@@ -434,4 +434,27 @@ router.delete('/games/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// Duplicate session
+router.post('/sessions/:id/duplicate', (req, res) => {
+  const sessions = load('godgamer-sessions');
+  const session = sessions.find(s => s.id === req.params.id);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  
+  const newSession = {
+    ...session,
+    id: uuidv4(),
+    name: session.name + ' (Copy)',
+    games: session.games.map(g => ({ ...g, id: uuidv4(), result: null, startedAt: null, endedAt: null, duration: null })),
+    currentGameIndex: 0,
+    isActive: false,
+    isFinished: false,
+    startedAt: null,
+    endedAt: null,
+    createdAt: Date.now()
+  };
+  sessions.push(newSession);
+  save('godgamer-sessions', sessions);
+  res.json(newSession);
+});
+
 module.exports = router;
