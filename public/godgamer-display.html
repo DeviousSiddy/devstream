@@ -84,7 +84,12 @@
     }
     .preview-text { font-size: 32px; color: #fff; }
     .game-count { color: #aaa; font-size: 12px; margin-top: 5px; }
-    .timer-controls { display: flex; gap: 10px; margin-top: 10px; }
+    .timer-controls { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+    .session-controls { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; align-items: center; }
+    .manual-game { margin-top: 10px; padding: 10px; background: #333; border-radius: 4px; }
+    .manual-game textarea { min-height: 80px; font-family: monospace; font-size: 12px; }
+    .btn-secondary { background: #666; }
+    .btn-secondary:hover { background: #777; }
   </style>
 </head>
 <body>
@@ -117,7 +122,15 @@
       <div class="timer-controls">
         <button class="btn btn-success" id="startBtn" onclick="startSession()">Start Session</button>
         <button class="btn btn-stop" id="stopBtn" onclick="stopSession()" style="display: none;">Stop Session</button>
+        <button class="btn btn-secondary" id="finishBtn" onclick="finishSession()">Finish</button>
         <span id="sessionTimer" style="font-size: 24px; margin-left: 20px;"></span>
+      </div>
+      <div class="session-controls">
+        <button class="btn" id="prevBtn" onclick="prevGame()">Previous</button>
+        <button class="btn" id="nextBtn" onclick="nextGame()">Next</button>
+        <button class="btn btn-success" id="startGameBtn" onclick="startCurrentGame()">Start Game</button>
+        <button class="btn btn-stop" id="endGameWinBtn" onclick="endCurrentGame('win')">Win</button>
+        <button class="btn btn-stop" id="endGameLossBtn" onclick="endCurrentGame('loss')">Loss</button>
       </div>
     </div>
   </div>
@@ -139,6 +152,11 @@
         </div>
         <button class="btn btn-sm" onclick="addGameToSession()">Add to Session</button>
       </div>
+    </div>
+    <div class="manual-game">
+      <label>Or add game manually (JSON)</label>
+      <textarea id="manualGameJson" placeholder='{"name": "Game Name", "platform": "PC", "tgdbId": 12345, "steamId": "76561198000000000", "boxartUrl": "https://..."}'></textarea>
+      <button class="btn btn-sm" onclick="addManualGame()" style="margin-top: 5px;">Add Manual Game</button>
     </div>
   </div>
 
@@ -194,6 +212,13 @@
         <label>Y Position</label>
         <input type="number" id="posY" value="100">
       </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Icon Size (px)</label>
+        <input type="number" id="iconSize" value="32" min="16" max="128">
+      </div>
+      <div></div>
     </div>
     <div class="row">
       <div>
@@ -274,6 +299,7 @@
         document.getElementById('opacityVal').textContent = ((session.opacity ?? 1) * 100) + '%';
         document.getElementById('posX').value = session.position?.x || 100;
         document.getElementById('posY').value = session.position?.y || 100;
+        document.getElementById('iconSize').value = session.iconSize || 32;
         document.getElementById('outlineEnabled').checked = session.outlineEnabled || false;
         document.getElementById('outlineColor').value = session.outlineColor || '#000000';
         document.getElementById('outlineWidth').value = session.outlineWidth || 2;
@@ -329,26 +355,96 @@
       updateStatus();
     }
 
+    async function finishSession() {
+      if (!session) return;
+      if (!confirm('Finish this session? This will freeze all timers.')) return;
+      
+      // End current game if active
+      const currentGame = session.games[session.currentGameIndex];
+      if (currentGame && currentGame.startedAt && !currentGame.endedAt) {
+        currentGame.endedAt = Date.now();
+        currentGame.duration = Math.floor((currentGame.endedAt - currentGame.startedAt) / 1000);
+        if (!currentGame.result) currentGame.result = 'win';
+      }
+      
+      session.isActive = false;
+      session.endedAt = Date.now();
+      await fetch('/api/godgamer/sessions/' + session.id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(session)
+      });
+      updateStatus();
+    }
+
+    async function nextGame() {
+      if (!session || session.currentGameIndex >= session.games.length - 1) return;
+      session.currentGameIndex++;
+      await fetch('/api/godgamer/sessions/' + session.id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentGameIndex: session.currentGameIndex })
+      });
+      renderGameList();
+      updateStatus();
+    }
+
+    async function prevGame() {
+      if (!session || session.currentGameIndex <= 0) return;
+      session.currentGameIndex--;
+      await fetch('/api/godgamer/sessions/' + session.id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentGameIndex: session.currentGameIndex })
+      });
+      renderGameList();
+      updateStatus();
+    }
+
     function updateStatus() {
       const statusEl = document.getElementById('status');
       const startBtn = document.getElementById('startBtn');
       const stopBtn = document.getElementById('stopBtn');
+      const finishBtn = document.getElementById('finishBtn');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const startGameBtn = document.getElementById('startGameBtn');
+      const endGameWinBtn = document.getElementById('endGameWinBtn');
+      const endGameLossBtn = document.getElementById('endGameLossBtn');
       
       if (session.isActive) {
         statusEl.className = 'status status-active';
         statusEl.textContent = 'Session Active - Playing game ' + (session.currentGameIndex + 1) + ' of ' + session.games.length;
         startBtn.style.display = 'none';
         stopBtn.style.display = 'inline-block';
+        finishBtn.style.display = 'inline-block';
+        prevBtn.disabled = session.currentGameIndex <= 0;
+        nextBtn.disabled = session.currentGameIndex >= session.games.length - 1;
+        startGameBtn.disabled = false;
+        endGameWinBtn.disabled = false;
+        endGameLossBtn.disabled = false;
       } else if (session.endedAt) {
         statusEl.className = 'status status-completed';
         statusEl.textContent = 'Session Completed';
-        startBtn.style.display = 'inline-block';
+        startBtn.style.display = 'none';
         stopBtn.style.display = 'none';
+        finishBtn.style.display = 'none';
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        startGameBtn.disabled = true;
+        endGameWinBtn.disabled = true;
+        endGameLossBtn.disabled = true;
       } else {
         statusEl.className = 'status status-inactive';
         statusEl.textContent = 'Session Inactive - Press Start to begin';
         startBtn.style.display = 'inline-block';
         stopBtn.style.display = 'none';
+        finishBtn.style.display = 'inline-block';
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        startGameBtn.disabled = true;
+        endGameWinBtn.disabled = true;
+        endGameLossBtn.disabled = true;
       }
     }
 
@@ -456,6 +552,50 @@
         
         selectedGameData = null;
         document.getElementById('selectedGame').style.display = 'none';
+        renderGameList();
+        updatePreview();
+      } catch (e) {
+        alert('Failed to add game');
+      }
+    }
+
+    async function addManualGame() {
+      if (!session) return;
+      
+      const jsonText = document.getElementById('manualGameJson').value.trim();
+      if (!jsonText) {
+        alert('Please enter game JSON');
+        return;
+      }
+      
+      let gameData;
+      try {
+        gameData = JSON.parse(jsonText);
+      } catch (e) {
+        alert('Invalid JSON: ' + e.message);
+        return;
+      }
+      
+      if (!gameData.name) {
+        alert('Game name is required');
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/godgamer/sessions/' + session.id + '/games', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tgdbId: gameData.tgdbId || null,
+            name: gameData.name,
+            platform: gameData.platform || 'Unknown',
+            steamId: gameData.steamId || null,
+            boxartUrl: gameData.boxartUrl || null
+          })
+        });
+        session = await res.json();
+        
+        document.getElementById('manualGameJson').value = '';
         renderGameList();
         updatePreview();
       } catch (e) {
@@ -574,6 +714,7 @@
           x: parseInt(document.getElementById('posX').value) || 100,
           y: parseInt(document.getElementById('posY').value) || 100
         },
+        iconSize: parseInt(document.getElementById('iconSize').value) || 32,
         outlineEnabled: document.getElementById('outlineEnabled').checked,
         outlineColor: document.getElementById('outlineColor').value,
         outlineWidth: parseInt(document.getElementById('outlineWidth').value) || 2,

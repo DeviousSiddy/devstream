@@ -189,6 +189,7 @@ router.post('/sessions', (req, res) => {
     outlineEnabled: req.body.outlineEnabled || false,
     outlineColor: req.body.outlineColor || '#000000',
     outlineWidth: req.body.outlineWidth || 2,
+    iconSize: req.body.iconSize || 32,
     customCSS: req.body.customCSS || ''
   };
 

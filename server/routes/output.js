@@ -92,9 +92,10 @@ function renderOverlays() {
       }
 
       const durationText = game.duration ? formatDuration(game.duration) : '';
+      const iconSize = session.iconSize || 32;
       const imgHtml = game.boxartUrl
-        ? `<img class="godgamer-icon" src="${game.boxartUrl}" alt="" onerror="this.style.display='none'">`
-        : `<div class="godgamer-icon-placeholder"></div>`;
+        ? `<img class="godgamer-icon" src="${game.boxartUrl}" alt="" onerror="this.style.display='none'" style="width:${iconSize}px; height:${iconSize}px;">`
+        : `<div class="godgamer-icon-placeholder" style="width:${iconSize}px; height:${iconSize}px;"></div>`;
 
       return `
         <div class="godgamer-game ${resultClass}">
