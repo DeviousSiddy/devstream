@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Text Display Settings</title>
+  <title>Scrolling Text Settings</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: #fff; }
@@ -13,7 +13,7 @@
       width: 100%; padding: 8px; background: #333; border: 1px solid #555; 
       color: #fff; border-radius: 4px;
     }
-    textarea { min-height: 100px; font-family: monospace; }
+    textarea { min-height: 80px; font-family: monospace; }
     .row { display: flex; gap: 15px; }
     .row .form-group { flex: 1; }
     .btn { 
@@ -31,13 +31,24 @@
     }
     .preview { 
       margin-top: 20px; padding: 20px; background: #2a2a2a; border-radius: 4px;
-      min-height: 100px; position: relative;
+      min-height: 80px;
     }
-    .preview-text { text-align: center; }
+    .preview-text {
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .lines-editor { margin-top: 10px; }
+    .line-item { display: flex; gap: 8px; margin-bottom: 8px; }
+    .line-item input { flex: 1; }
+    .line-item button { padding: 4px 8px; background: #ff4d4d; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .add-line { margin-top: 8px; padding: 6px 12px; background: #4dff4d; color: #000; border: none; border-radius: 4px; cursor: pointer; }
+    .checkbox-row { display: flex; gap: 20px; margin-bottom: 15px; }
+    .checkbox-row label { display: inline-flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer; }
+    .checkbox-row input[type="checkbox"] { width: auto; }
   </style>
 </head>
 <body>
-  <h1>Text Display Settings</h1>
+  <h1>Scrolling Text Settings</h1>
   
   <form id="settingsForm">
     <div class="form-group">
@@ -46,18 +57,23 @@
     </div>
 
     <div class="form-group">
-      <label>Text Content</label>
-      <textarea id="text" required></textarea>
+      <label>Text Lines</label>
+      <div id="linesEditor" class="lines-editor"></div>
+      <button type="button" class="add-line" onclick="addLine()">+ Add Line</button>
+    </div>
+
+    <div class="checkbox-row">
+      <label><input type="checkbox" id="randomizeLines"> Randomize Lines</label>
     </div>
 
     <div class="row">
       <div class="form-group">
-        <label>Duration (seconds)</label>
-        <input type="number" id="duration" min="1" value="30">
+        <label>Font Size (px)</label>
+        <input type="number" id="fontSize" min="1" value="36">
       </div>
       <div class="form-group">
-        <label>Font Size (px)</label>
-        <input type="number" id="fontSize" min="1" value="48">
+        <label>Scroll Speed (px/frame)</label>
+        <input type="number" id="scrollSpeed" min="0.5" step="0.5" value="2">
       </div>
     </div>
 
@@ -92,12 +108,23 @@
 
     <div class="row">
       <div class="form-group">
+        <label>Separator</label>
+        <input type="text" id="separator" value=" • ">
+      </div>
+      <div class="form-group">
+        <label>Container Height (px)</label>
+        <input type="number" id="containerHeight" min="20" value="50">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
         <label>Position X</label>
-        <input type="number" id="posX" value="100">
+        <input type="number" id="posX" value="0">
       </div>
       <div class="form-group">
         <label>Position Y</label>
-        <input type="number" id="posY" value="100">
+        <input type="number" id="posY" value="0">
       </div>
     </div>
 
@@ -113,17 +140,10 @@
         </select>
       </div>
       <div class="form-group">
-        <label>Show Timer</label>
-        <select id="showTimer">
-          <option value="true">Yes</option>
-          <option value="false">No</option>
-        </select>
-      </div>
-      <div class="form-group">
         <label>Text Align</label>
         <select id="textAlign">
-          <option value="left">Left</option>
-          <option value="center" selected>Center</option>
+          <option value="left" selected>Left</option>
+          <option value="center">Center</option>
           <option value="right">Right</option>
         </select>
       </div>
@@ -148,33 +168,60 @@
 
   <div class="preview">
     <h3>Preview</h3>
-    <div class="preview-text" id="previewText"></div>
+    <div id="previewText" class="preview-text"></div>
   </div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const overlayId = params.get('id');
     let currentOverlay = null;
+    let lines = ['Line 1', 'Line 2'];
 
     function toggleCSS() {
       document.getElementById('cssEditor').classList.toggle('show');
     }
 
+    function renderLines() {
+      const editor = document.getElementById('linesEditor');
+      editor.innerHTML = lines.map((line, i) => `
+        <div class="line-item">
+          <input type="text" value="${line}" onchange="updateLine(${i}, this.value)" placeholder="Line ${i + 1}">
+          <button type="button" onclick="removeLine(${i})">×</button>
+        </div>
+      `).join('');
+    }
+
+    function addLine() {
+      lines.push('');
+      renderLines();
+    }
+
+    function removeLine(index) {
+      lines.splice(index, 1);
+      renderLines();
+    }
+
+    function updateLine(index, value) {
+      lines[index] = value;
+    }
+
     function updatePreview() {
-      const text = document.getElementById('text').value;
       const fontSize = document.getElementById('fontSize').value;
       const fontColor = document.getElementById('fontColor').value;
       const font = document.getElementById('font').value;
-      const textAlign = document.getElementById('textAlign').value;
+      const separator = document.getElementById('separator').value;
+      const bgTransparent = document.getElementById('bgTransparent').checked;
+      const bgColor = document.getElementById('bgColor').value;
       const outlineEnabled = document.getElementById('outlineEnabled').checked;
       const outlineColor = document.getElementById('outlineColor').value;
       const outlineWidth = document.getElementById('outlineWidth').value;
-      const bgTransparent = document.getElementById('bgTransparent').checked;
-      const bgColor = document.getElementById('bgColor').value;
+      const textAlign = document.getElementById('textAlign').value;
       const opacity = document.getElementById('opacity').value / 100;
       
       const preview = document.getElementById('previewText');
-      preview.textContent = text;
+      
+      const scrollText = lines.filter(l => l).join(separator);
+      preview.textContent = scrollText;
       preview.style.fontSize = fontSize + 'px';
       preview.style.color = fontColor;
       preview.style.fontFamily = font;
@@ -194,8 +241,10 @@
       
       if (!bgTransparent) {
         preview.style.backgroundColor = bgColor;
+        preview.style.padding = '10px';
       } else {
         preview.style.backgroundColor = 'transparent';
+        preview.style.padding = '0';
       }
     }
 
@@ -210,24 +259,25 @@
 
     async function loadOverlay() {
       if (!overlayId) return;
-      const res = await fetch('/api/text/' + overlayId);
+      const res = await fetch('/api/scroll/' + overlayId);
       if (!res.ok) return;
       currentOverlay = await res.json();
       
       document.getElementById('name').value = currentOverlay.name;
-      document.getElementById('text').value = currentOverlay.text;
-      document.getElementById('duration').value = currentOverlay.duration;
       document.getElementById('fontSize').value = currentOverlay.fontSize;
       document.getElementById('fontColor').value = currentOverlay.fontColor;
+      document.getElementById('scrollSpeed').value = currentOverlay.scrollSpeed;
+      document.getElementById('separator').value = currentOverlay.separator;
+      document.getElementById('containerHeight').value = currentOverlay.containerHeight;
       document.getElementById('posX').value = currentOverlay.position.x;
       document.getElementById('posY').value = currentOverlay.position.y;
       document.getElementById('font').value = currentOverlay.font;
-      document.getElementById('showTimer').value = currentOverlay.showTimer.toString();
-      document.getElementById('textAlign').value = currentOverlay.textAlign || 'center';
+      document.getElementById('textAlign').value = currentOverlay.textAlign || 'left';
       document.getElementById('outlineColor').value = currentOverlay.outlineColor || '#000000';
       document.getElementById('outlineEnabled').checked = currentOverlay.outlineEnabled || false;
       document.getElementById('outlineWidth').value = currentOverlay.outlineWidth || 2;
       document.getElementById('customCSS').value = currentOverlay.customCSS || '';
+      document.getElementById('randomizeLines').checked = currentOverlay.randomizeLines || false;
       document.getElementById('opacity').value = (currentOverlay.opacity ?? 1) * 100;
       document.getElementById('opacityValue').textContent = ((currentOverlay.opacity ?? 1) * 100).toString();
       
@@ -236,6 +286,8 @@
         document.getElementById('bgColor').value = currentOverlay.backgroundColor;
       }
       
+      lines = currentOverlay.lines || ['Line 1', 'Line 2'];
+      renderLines();
       updatePreview();
     }
 
@@ -243,41 +295,43 @@
       e.preventDefault();
       const data = {
         name: document.getElementById('name').value,
-        text: document.getElementById('text').value,
-        duration: parseInt(document.getElementById('duration').value),
+        lines: lines.filter(l => l),
         fontSize: parseInt(document.getElementById('fontSize').value),
         fontColor: document.getElementById('fontColor').value,
         backgroundColor: document.getElementById('bgTransparent').checked 
           ? 'transparent' 
           : document.getElementById('bgColor').value,
+        scrollSpeed: parseFloat(document.getElementById('scrollSpeed').value),
+        separator: document.getElementById('separator').value,
+        containerHeight: parseInt(document.getElementById('containerHeight').value),
         position: { 
           x: parseInt(document.getElementById('posX').value), 
           y: parseInt(document.getElementById('posY').value) 
         },
         font: document.getElementById('font').value,
-        showTimer: document.getElementById('showTimer').value === 'true',
         textAlign: document.getElementById('textAlign').value,
         outlineColor: document.getElementById('outlineColor').value,
         outlineEnabled: document.getElementById('outlineEnabled').checked,
         outlineWidth: parseInt(document.getElementById('outlineWidth').value),
         opacity: document.getElementById('opacity').value / 100,
-        customCSS: document.getElementById('customCSS').value
+        customCSS: document.getElementById('customCSS').value,
+        randomizeLines: document.getElementById('randomizeLines').checked
       };
 
       if (overlayId) {
-        await fetch('/api/text/' + overlayId, {
+        await fetch('/api/scroll/' + overlayId, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
       } else {
-        const res = await fetch('/api/text/create', {
+        const res = await fetch('/api/scroll/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
         const newOverlay = await res.json();
-        window.location.href = '/text-display?id=' + newOverlay.id;
+        window.location.href = '/scroll-display?id=' + newOverlay.id;
         return;
       }
       alert('Saved!');
@@ -285,23 +339,24 @@
 
     async function startOverlay() {
       if (!overlayId) return alert('Save first');
-      await fetch('/api/text/' + overlayId + '/start', { method: 'POST' });
+      await fetch('/api/scroll/' + overlayId + '/start', { method: 'POST' });
       alert('Started!');
     }
 
     async function stopOverlay() {
       if (!overlayId) return;
-      await fetch('/api/text/' + overlayId + '/stop', { method: 'POST' });
+      await fetch('/api/scroll/' + overlayId + '/stop', { method: 'POST' });
       alert('Stopped!');
     }
 
     async function deleteOverlay() {
       if (!overlayId) return;
       if (!confirm('Delete this overlay?')) return;
-      await fetch('/api/text/' + overlayId, { method: 'DELETE' });
+      await fetch('/api/scroll/' + overlayId, { method: 'DELETE' });
       window.location.href = '/console';
     }
 
+    renderLines();
     loadOverlay();
     updatePreview();
   </script>

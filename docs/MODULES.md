@@ -10,6 +10,10 @@ All modules share these features:
 - **Custom CSS** - "Show CSS" button in settings for advanced styling
 - **Start/Stop Control** - Toggle visibility from console
 - **Persistence** - Settings saved to JSON files
+- **Opacity** - Adjustable transparency (0-100%)
+- **Background Color** - Optional background color
+- **Text Outline** - Enable/disable with color and width
+- **Font Customization** - Family, size, and color
 
 ---
 
@@ -27,6 +31,7 @@ All modules share these features:
 - Font customization (family, size, color)
 - Text outline (enable/disable, color, width)
 - Position control
+- Opacity control (0-100%)
 
 ### Settings
 
@@ -45,6 +50,7 @@ All modules share these features:
 | outlineEnabled | boolean | false | Enable text outline |
 | outlineColor | string | "#000000" | Outline color |
 | outlineWidth | number | 2 | Outline width in pixels |
+| opacity | number | 1 | Opacity (0-1) |
 | customCSS | string | "" | Custom CSS injection |
 
 ### API Endpoints
@@ -70,7 +76,9 @@ All modules share these features:
 
 ## Scrolling Text
 
-**Status:** Planned  
+**Status:** Complete  
+**Settings:** `/scroll-display`  
+**API:** `/api/scroll/*`  
 **Complexity:** Medium
 
 ### Features
@@ -78,11 +86,14 @@ All modules share these features:
 - Configurable scroll speed
 - Seamless looping
 - Separator between lines
+- Randomize line order on each loop
+- Opacity control (0-100%)
 
-### Settings (Planned)
+### Settings
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
+| name | string | "Untitled Scroll" | Display name in console |
 | lines | array | [] | Array of text items |
 | fontSize | number | 36 | Font size in pixels |
 | fontColor | string | "#ffffff" | Text color |
@@ -92,17 +103,33 @@ All modules share these features:
 | separator | string | " • " | Separator between lines |
 | containerHeight | number | 50 | Height in pixels |
 | position | object | {x: 0, y: 0} | X/Y coordinates |
+| textAlign | string | "left" | Text alignment |
+| outlineEnabled | boolean | false | Enable text outline |
+| outlineColor | string | "#000000" | Outline color |
+| outlineWidth | number | 2 | Outline width in pixels |
+| opacity | number | 1 | Opacity (0-1) |
+| randomizeLines | boolean | false | Shuffle lines on each loop |
 | customCSS | string | "" | Custom CSS injection |
 
-### API Endpoints (Planned)
+### API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | /api/scroll | List all overlays |
+| GET | /api/scroll/:id | Get single overlay |
 | POST | /api/scroll/create | Create new overlay |
 | PUT | /api/scroll/:id | Update overlay |
 | DELETE | /api/scroll/:id | Delete overlay |
 | POST | /api/scroll/:id/start | Start scrolling |
 | POST | /api/scroll/:id/stop | Stop scrolling |
+| GET | /api/scroll/:id/state | Get current state |
+
+### Scroll Implementation
+- Client-side animation using `requestAnimationFrame`
+- Text starts off-screen right, scrolls left
+- Resets to right edge when fully scrolled past
+- Randomize: lines shuffled client-side on each reset
+- Lines stored in `data-lines` attribute for client-side access
 
 ---
 
@@ -129,6 +156,7 @@ All modules share these features:
 | fontColor | string | "#ffffff" | Text color |
 | backgroundColor | string | "transparent" | Background color |
 | position | object | {x: 100, y: 100} | X/Y coordinates |
+| opacity | number | 1 | Opacity (0-1) |
 | customCSS | string | "" | Custom CSS injection |
 
 ### Data Models (Planned)

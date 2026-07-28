@@ -3,6 +3,7 @@ const path = require('path');
 const outputRoutes = require('./routes/output');
 const consoleRoutes = require('./routes/console');
 const apiRoutes = require('./routes/api');
+const scrollRoutes = require('./routes/scroll');
 const debugRoutes = require('./routes/debug');
 
 const app = express();
@@ -14,10 +15,15 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/', outputRoutes);
 app.use('/', consoleRoutes);
 app.use('/api', apiRoutes);
+app.use('/api/scroll', scrollRoutes);
 app.use('/', debugRoutes);
 
 app.get('/text-display', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'text-display.html'));
+});
+
+app.get('/scroll-display', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'scroll-display.html'));
 });
 
 app.listen(PORT, () => {

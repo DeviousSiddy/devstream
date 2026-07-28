@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { load, save } = require('../store');
 
-function renderRow(overlay) {
+function renderTextRow(overlay) {
   let status = 'Inactive';
   let statusClass = '';
   if (overlay.isActive) {
@@ -20,11 +20,37 @@ function renderRow(overlay) {
   return `
     <tr>
       <td>${overlay.name}</td>
+      <td>${overlay.text}</td>
       <td class="${statusClass}">${status}</td>
       <td>
         <a href="/text-display?id=${overlay.id}">Settings</a>
-        <button class="btn btn-sm" onclick="toggleOverlay('${overlay.id}', ${!overlay.isActive})">${overlay.isActive ? 'Stop' : 'Start'}</button>
-        <button class="btn btn-sm btn-stop" onclick="deleteOverlay('${overlay.id}', '${overlay.name}')">Delete</button>
+        <button class="btn btn-sm" onclick="toggleTextOverlay('${overlay.id}', ${!overlay.isActive})">${overlay.isActive ? 'Stop' : 'Start'}</button>
+        <button class="btn btn-sm btn-stop" onclick="deleteTextOverlay('${overlay.id}', '${overlay.name}')">Delete</button>
+      </td>
+    </tr>
+  `;
+}
+
+function renderScrollRow(overlay) {
+  let status = 'Inactive';
+  let statusClass = '';
+  if (overlay.isActive) {
+    status = 'On Screen';
+    statusClass = 'status-active';
+  }
+
+  const preview = (overlay.lines || []).slice(0, 2).join(', ');
+  const previewTruncated = preview.length > 40 ? preview.substring(0, 40) + '...' : preview;
+
+  return `
+    <tr>
+      <td>${overlay.name}</td>
+      <td>${previewTruncated}</td>
+      <td class="${statusClass}">${status}</td>
+      <td>
+        <a href="/scroll-display?id=${overlay.id}">Settings</a>
+        <button class="btn btn-sm" onclick="toggleScrollOverlay('${overlay.id}', ${!overlay.isActive})">${overlay.isActive ? 'Stop' : 'Start'}</button>
+        <button class="btn btn-sm btn-stop" onclick="deleteScrollOverlay('${overlay.id}', '${overlay.name}')">Delete</button>
       </td>
     </tr>
   `;
@@ -32,7 +58,10 @@ function renderRow(overlay) {
 
 function renderConsole() {
   const textOverlays = load('text-overlays');
-  const overlayRows = textOverlays.map(renderRow).join('');
+  const scrollOverlays = load('scroll-overlays');
+  
+  const textRows = textOverlays.map(renderTextRow).join('');
+  const scrollRows = scrollOverlays.map(renderScrollRow).join('');
 
   return `<!DOCTYPE html>
 <html>
@@ -43,6 +72,7 @@ function renderConsole() {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: #fff; }
     h1 { margin-bottom: 20px; }
+    h2 { margin-bottom: 10px; color: #aaa; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
     th, td { padding: 10px; border: 1px solid #444; text-align: left; }
     th { background: #333; }
@@ -61,6 +91,15 @@ function renderConsole() {
     .overlay-size input { width: 80px; padding: 5px; background: #333; border: 1px solid #555; color: #fff; }
     .status-active { color: #4dff4d; font-weight: bold; }
     .status-expired { color: #ff994d; }
+    .new-overlay-btn { margin-bottom: 15px; }
+    .module-picker { display: none; margin-bottom: 15px; padding: 15px; background: #2a2a2a; border-radius: 4px; }
+    .module-picker.show { display: block; }
+    .module-picker h3 { margin-bottom: 10px; }
+    .module-option { 
+      display: inline-block; padding: 10px 20px; margin: 5px; background: #333; 
+      border: 1px solid #555; border-radius: 4px; cursor: pointer; text-decoration: none; color: #fff;
+    }
+    .module-option:hover { background: #4da6ff; border-color: #4da6ff; }
   </style>
 </head>
 <body>
@@ -72,21 +111,51 @@ function renderConsole() {
     <label>Height: <input type="number" id="height" value="1080"></label>
   </div>
 
+  <div class="new-overlay-btn">
+    <button class="btn" onclick="showModulePicker()">+ New Overlay</button>
+  </div>
+
+  <div class="module-picker" id="modulePicker">
+    <h3>Choose Module Type</h3>
+    <a href="/text-display" class="module-option">Text Display</a>
+    <a href="/scroll-display" class="module-option">Scrolling Text</a>
+    <button class="btn btn-stop" onclick="hideModulePicker()" style="margin-left: 10px;">Cancel</button>
+  </div>
+
   <div class="section">
     <h2>Text Display Overlays</h2>
-    <a href="/text-display" class="btn">+ New Overlay</a>
     <table>
       <thead>
-        <tr><th>Name</th><th>Status</th><th>Actions</th></tr>
+        <tr><th>Name</th><th>Preview</th><th>Status</th><th>Actions</th></tr>
       </thead>
-      <tbody id="overlayTable">
-        ${overlayRows || '<tr><td colspan="3">No overlays yet</td></tr>'}
+      <tbody id="textTable">
+        ${textRows || '<tr><td colspan="4">No overlays yet</td></tr>'}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Scrolling Text Overlays</h2>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Preview</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="scrollTable">
+        ${scrollRows || '<tr><td colspan="4">No overlays yet</td></tr>'}
       </tbody>
     </table>
   </div>
 
   <script>
-    async function toggleOverlay(id, activate) {
+    function showModulePicker() {
+      document.getElementById('modulePicker').classList.add('show');
+    }
+
+    function hideModulePicker() {
+      document.getElementById('modulePicker').classList.remove('show');
+    }
+
+    async function toggleTextOverlay(id, activate) {
       const endpoint = activate 
         ? '/api/text/' + id + '/start'
         : '/api/text/' + id + '/stop';
@@ -94,17 +163,32 @@ function renderConsole() {
       refreshConsole();
     }
 
-    async function deleteOverlay(id, name) {
+    async function deleteTextOverlay(id, name) {
       if (!confirm('Delete "' + name + '"?')) return;
       await fetch('/api/text/' + id, { method: 'DELETE' });
+      refreshConsole();
+    }
+
+    async function toggleScrollOverlay(id, activate) {
+      const endpoint = activate 
+        ? '/api/scroll/' + id + '/start'
+        : '/api/scroll/' + id + '/stop';
+      await fetch(endpoint, { method: 'POST' });
+      refreshConsole();
+    }
+
+    async function deleteScrollOverlay(id, name) {
+      if (!confirm('Delete "' + name + '"?')) return;
+      await fetch('/api/scroll/' + id, { method: 'DELETE' });
       refreshConsole();
     }
 
     async function refreshConsole() {
       try {
         const res = await fetch('/console/render');
-        const html = await res.text();
-        document.getElementById('overlayTable').innerHTML = html;
+        const data = await res.json();
+        document.getElementById('textTable').innerHTML = data.textRows || '<tr><td colspan="4">No overlays yet</td></tr>';
+        document.getElementById('scrollTable').innerHTML = data.scrollRows || '<tr><td colspan="4">No overlays yet</td></tr>';
       } catch (e) {}
     }
 
@@ -120,8 +204,12 @@ router.get('/console', (req, res) => {
 
 router.get('/console/render', (req, res) => {
   const textOverlays = load('text-overlays');
-  const rows = textOverlays.map(renderRow).join('');
-  res.send(rows);
+  const scrollOverlays = load('scroll-overlays');
+  
+  const textRows = textOverlays.map(renderTextRow).join('');
+  const scrollRows = scrollOverlays.map(renderScrollRow).join('');
+  
+  res.json({ textRows, scrollRows });
 });
 
 module.exports = router;
