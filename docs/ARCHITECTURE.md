@@ -64,20 +64,28 @@ Console (/console)
 
 ### Server Files
 
-- `server/index.js` - Express app setup, route mounting
+- `server/index.js` - Express app setup, route mounting, dotenv config
 - `server/store.js` - JSON file persistence (load/save)
-- `server/routes/api.js` - REST API for overlays
-- `server/routes/console.js` - Console page
-- `server/routes/output.js` - OBS output page
+- `server/routes/api.js` - REST API for text overlays + duplicate
+- `server/routes/scroll.js` - REST API for scroll overlays + duplicate
+- `server/routes/godgamer.js` - REST API for God Gamer sessions, players, games DB, TGDB search, finish, duplicate
+- `server/routes/console.js` - Console page (all modules)
+- `server/routes/output.js` - OBS output page (all modules)
 - `server/routes/debug.js` - Debug interface
 
 ### Static Files
 
-- `public/text-display.html` - Settings page for overlays
+- `public/text-display.html` - Settings page for text overlays
+- `public/scroll-display.html` - Settings page for scroll overlays
+- `public/godgamer-display.html` - Settings page for God Gamer sessions
 
 ### Data Files
 
-- `data/text-overlays.json` - Persisted overlay configurations
+- `data/text-overlays.json` - Persisted text overlay configurations
+- `data/scroll-overlays.json` - Persisted scroll overlay configurations
+- `data/godgamer-sessions.json` - God Gamer sessions with game history
+- `data/godgamer-players.json` - Player records
+- `data/godgamer-games.json` - Local game database (cached from TGDB)
 
 ## Key Design Decisions
 
@@ -118,13 +126,16 @@ Timers use a `data-started` timestamp and calculate remaining time client-side:
 - Timer updates every second via `setInterval`
 - Overlay hidden when timer expires
 
-## Module System (Planned)
+## Module System
 
-Each overlay type is a module with:
-- Settings page (HTML)
-- API endpoints (CRUD)
-- Output rendering
-- Store schema
+Each overlay type is a self-contained module with:
+- Route file: `server/routes/{module}.js`
+- Settings page: `public/{module}-display.html`
+- Store file: `data/{module}-*.json`
+- Console entries in `server/routes/console.js`
+- Output rendering in `server/routes/output.js`
+
+Modules share common features: transparent backgrounds, positioning, opacity, text outline, font customization, custom CSS, and duplicate support.
 
 ```javascript
 // Example module structure

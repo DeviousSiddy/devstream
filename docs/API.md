@@ -141,6 +141,18 @@ Returns current state including timer calculations.
 
 ---
 
+### Duplicate Overlay
+
+```http
+POST /api/text/:id/duplicate
+```
+
+Creates a copy with an auto-incremented name (e.g., "My Overlay" -> "My Overlay 2"). Sets `isActive: false` and `startedAt: null` on the copy.
+
+**Response:** New overlay object
+
+---
+
 ## Scrolling Text API
 
 ### Create Overlay
@@ -283,6 +295,291 @@ Returns current state.
 
 ---
 
+### Duplicate Overlay
+
+```http
+POST /api/scroll/:id/duplicate
+```
+
+Creates a copy with an auto-incremented name (e.g., "My Scroll" -> "My Scroll 2"). Sets `isActive: false` and `startedAt: null` on the copy.
+
+**Response:** New overlay object
+
+---
+
+## God Gamer Challenge API
+
+### Search Games on TGDB
+
+```http
+GET /api/godgamer/search?q=game+name
+```
+
+Search for games on TheGamesDB.
+
+**Response:** Array of game objects with tgdbId, name, platform, boxartUrl
+
+---
+
+### Get Game Details
+
+```http
+GET /api/godgamer/game/:tgdbId
+```
+
+Get detailed game information from TGDB.
+
+**Response:** Game object with tgdbId, name, platform, steamId, boxartUrl, overview
+
+---
+
+### List Local Game Database
+
+```http
+GET /api/godgamer/games
+```
+
+**Response:** Array of games stored locally
+
+---
+
+### Delete Game from Database
+
+```http
+DELETE /api/godgamer/games/:id
+```
+
+**Response:** `{ "success": true }`
+
+---
+
+### List Players
+
+```http
+GET /api/godgamer/players
+```
+
+**Response:** Array of player objects
+
+---
+
+### Create Player
+
+```http
+POST /api/godgamer/players
+Content-Type: application/json
+```
+
+**Request Body:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Player name |
+
+**Response:** Player object (returns existing if name matches)
+
+---
+
+### Delete Player
+
+```http
+DELETE /api/godgamer/players/:id
+```
+
+**Response:** `{ "success": true }`
+
+---
+
+### Create Session
+
+```http
+POST /api/godgamer/sessions
+Content-Type: application/json
+```
+
+**Request Body:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | string | "God Gamer Session" | Session name |
+| `cap` | number | 10 | Max games |
+| `players` | array | ["devioussiddy"] | Player names |
+| `fontSize` | number | 32 | Font size |
+| `fontColor` | string | "#ffffff" | Font color |
+| `font` | string | "Arial" | Font family |
+| `backgroundColor` | string | "transparent" | Background |
+| `position` | object | {x: 100, y: 100} | Position |
+| `opacity` | number | 1 | Opacity (0-1) |
+| `outlineEnabled` | boolean | false | Text outline |
+| `outlineColor` | string | "#000000" | Outline color |
+| `outlineWidth` | number | 2 | Outline width |
+| `customCSS` | string | "" | Custom CSS |
+
+**Response:** Session object
+
+---
+
+### Get All Sessions
+
+```http
+GET /api/godgamer/sessions
+```
+
+**Response:** Array of session objects
+
+---
+
+### Get Session
+
+```http
+GET /api/godgamer/sessions/:id
+```
+
+**Response:** Session object
+
+---
+
+### Update Session
+
+```http
+PUT /api/godgamer/sessions/:id
+Content-Type: application/json
+```
+
+**Request Body:** Partial session object (fields to update)
+
+**Response:** Updated session object
+
+---
+
+### Delete Session
+
+```http
+DELETE /api/godgamer/sessions/:id
+```
+
+**Response:** `{ "success": true }`
+
+---
+
+### Start Session
+
+```http
+POST /api/godgamer/sessions/:id/start
+```
+
+Sets `isActive: true` and `startedAt: Date.now()`
+
+**Response:** Updated session object
+
+---
+
+### Stop Session
+
+```http
+POST /api/godgamer/sessions/:id/stop
+```
+
+Sets `isActive: false` and `endedAt: Date.now()`. Session data remains but overlay is hidden.
+
+**Response:** Updated session object
+
+---
+
+### Finish Session
+
+```http
+POST /api/godgamer/sessions/:id/finish
+```
+
+Freezes timers by setting `isFinished: true` and `endedAt: Date.now()`. Also freezes the current game's timer if it was running. Unlike stop, the overlay remains visible with frozen times.
+
+**Response:** Updated session object
+
+---
+
+### Add Game to Session
+
+```http
+POST /api/godgamer/sessions/:id/games
+Content-Type: application/json
+```
+
+**Request Body:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tgdbId` | number | TGDB game ID |
+| `name` | string | Game name |
+| `platform` | string | Platform |
+| `steamId` | string | Steam ID (optional) |
+| `boxartUrl` | string | Boxart URL (optional) |
+
+**Response:** Updated session object
+
+---
+
+### Remove Game from Session
+
+```http
+DELETE /api/godgamer/sessions/:id/games/:gameId
+```
+
+**Response:** Updated session object
+
+---
+
+### Start Current Game
+
+```http
+POST /api/godgamer/sessions/:id/games/current/start
+```
+
+Sets `startedAt: Date.now()` on current game.
+
+**Response:** Updated session object
+
+---
+
+### End Current Game
+
+```http
+POST /api/godgamer/sessions/:id/games/current/end
+Content-Type: application/json
+```
+
+**Request Body:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `result` | string | "win" or "loss" |
+
+**Response:** Updated session object
+
+---
+
+### Get Session State
+
+```http
+GET /api/godgamer/sessions/:id/state
+```
+
+**Response:** Session object with current state
+
+---
+
+### Duplicate Session
+
+```http
+POST /api/godgamer/sessions/:id/duplicate
+```
+
+Creates a copy with an auto-incremented name (e.g., "God Gamer Session" -> "God Gamer Session 2"). Resets games (clears results/timing), `currentGameIndex: 0`, `isActive: false`, `isFinished: false`.
+
+**Response:** New session object
+
+---
+
 ## Output Endpoints
 
 ### Output Page (OBS Browser Source)
@@ -323,7 +620,7 @@ Returns console HTML page for managing overlays.
 GET /console/render
 ```
 
-Returns JSON with `textRows` and `scrollRows` for auto-refresh.
+Returns JSON with `textRows`, `scrollRows`, and `godgamerSessions` for auto-refresh.
 
 ---
 
