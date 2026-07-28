@@ -145,8 +145,5 @@ vite.config.ts.timestamp-*
 # DevStream runtime data
 data/*.json
 
-# DevStream development notes
-ai_companion_notes.md
-ds_notes.md
-plan.md
-usage.md
+# DevStream AI context notes (not public)
+ai-notes/
