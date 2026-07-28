@@ -9,7 +9,7 @@ function renderOverlays() {
   
   const activeTextOverlays = textOverlays.filter(o => o.isActive);
   const activeScrollOverlays = scrollOverlays.filter(o => o.isActive);
-  const activeGodgamer = godgamerSessions.filter(s => s.isActive);
+  const activeGodgamer = godgamerSessions.filter(s => s.isActive || s.isFinished);
 
   const textHtml = activeTextOverlays.map(overlay => {
     let timerOutlineStyle = '';
@@ -109,7 +109,7 @@ function renderOverlays() {
     }).join('');
 
     const sessionTimerHtml = session.startedAt
-      ? `<div class="godgamer-session-timer" data-started="${session.startedAt}"></div>`
+      ? `<div class="godgamer-session-timer" data-started="${session.startedAt}" data-finished="${session.isFinished ? 'true' : 'false'}"></div>`
       : '';
 
     return `
@@ -260,11 +260,22 @@ router.get('/output', (req, res) => {
 
       document.querySelectorAll('.godgamer-session-timer').forEach(timer => {
         const started = parseInt(timer.dataset.started);
+        const isFinished = timer.dataset.finished === 'true';
         if (!started) { timer.textContent = ''; return; }
-        const elapsed = Math.floor((Date.now() - started) / 1000);
-        const mins = Math.floor(elapsed / 60);
-        const secs = elapsed % 60;
-        timer.textContent = mins.toString().padStart(2, '0') + ':' + secs.toString().padStart(2, '0');
+        
+        if (isFinished) {
+          // Show final frozen time
+          const endedAt = timer.dataset.endedAt ? parseInt(timer.dataset.endedAt) : Date.now();
+          const elapsed = Math.floor((endedAt - started) / 1000);
+          const mins = Math.floor(elapsed / 60);
+          const secs = elapsed % 60;
+          timer.textContent = mins.toString().padStart(2, '0') + ':' + secs.toString().padStart(2, '0');
+        } else {
+          const elapsed = Math.floor((Date.now() - started) / 1000);
+          const mins = Math.floor(elapsed / 60);
+          const secs = elapsed % 60;
+          timer.textContent = mins.toString().padStart(2, '0') + ':' + secs.toString().padStart(2, '0');
+        }
       });
     }
 

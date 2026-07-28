@@ -357,24 +357,16 @@
 
     async function finishSession() {
       if (!session) return;
-      if (!confirm('Finish this session? This will freeze all timers.')) return;
       
-      // End current game if active
-      const currentGame = session.games[session.currentGameIndex];
-      if (currentGame && currentGame.startedAt && !currentGame.endedAt) {
-        currentGame.endedAt = Date.now();
-        currentGame.duration = Math.floor((currentGame.endedAt - currentGame.startedAt) / 1000);
-        if (!currentGame.result) currentGame.result = 'win';
+      try {
+        const res = await fetch('/api/godgamer/sessions/' + session.id + '/finish', {
+          method: 'POST'
+        });
+        session = await res.json();
+        updateStatus();
+      } catch (e) {
+        alert('Failed to finish session');
       }
-      
-      session.isActive = false;
-      session.endedAt = Date.now();
-      await fetch('/api/godgamer/sessions/' + session.id, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(session)
-      });
-      updateStatus();
     }
 
     async function nextGame() {
@@ -412,7 +404,18 @@
       const endGameWinBtn = document.getElementById('endGameWinBtn');
       const endGameLossBtn = document.getElementById('endGameLossBtn');
       
-      if (session.isActive) {
+      if (session.isFinished) {
+        statusEl.className = 'status status-completed';
+        statusEl.textContent = 'Session Finished - Timers frozen';
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+        finishBtn.style.display = 'none';
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        startGameBtn.disabled = true;
+        endGameWinBtn.disabled = true;
+        endGameLossBtn.disabled = true;
+      } else if (session.isActive) {
         statusEl.className = 'status status-active';
         statusEl.textContent = 'Session Active - Playing game ' + (session.currentGameIndex + 1) + ' of ' + session.games.length;
         startBtn.style.display = 'none';
@@ -639,7 +642,14 @@
           body: JSON.stringify({ result })
         });
         session = await res.json();
-        updateStatus();
+        
+        // If this was the last game, finish the session
+        if (session.currentGameIndex >= session.games.length - 1) {
+          await finishSession();
+        } else {
+          updateStatus();
+        }
+        
         renderGameList();
         updatePreview();
       } catch (e) {

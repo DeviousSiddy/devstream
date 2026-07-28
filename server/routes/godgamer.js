@@ -250,7 +250,27 @@ router.post('/sessions/:id/stop', (req, res) => {
   if (!session) return res.status(404).json({ error: 'Session not found' });
 
   session.isActive = false;
+  session.isFinished = false;
   session.endedAt = Date.now();
+  save('godgamer-sessions', sessions);
+  res.json(session);
+});
+
+// Finish session (freeze timers, keep overlay visible)
+router.post('/sessions/:id/finish', (req, res) => {
+  const sessions = load('godgamer-sessions');
+  const session = sessions.find(s => s.id === req.params.id);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+
+  // Freeze current game if active
+  const currentGame = session.games[session.currentGameIndex];
+  if (currentGame && currentGame.startedAt && !currentGame.endedAt) {
+    currentGame.endedAt = Date.now();
+    currentGame.duration = Math.floor((currentGame.endedAt - currentGame.startedAt) / 1000);
+    if (!currentGame.result) currentGame.result = 'win';
+  }
+
+  session.isFinished = true;
   save('godgamer-sessions', sessions);
   res.json(session);
 });
