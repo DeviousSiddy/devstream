@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Text Display Settings</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: #fff; }
+    h1 { margin-bottom: 20px; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input, textarea, select { 
+      width: 100%; padding: 8px; background: #333; border: 1px solid #555; 
+      color: #fff; border-radius: 4px;
+    }
+    textarea { min-height: 100px; font-family: monospace; }
+    .row { display: flex; gap: 15px; }
+    .row .form-group { flex: 1; }
+    .btn { 
+      display: inline-block; padding: 10px 20px; background: #4da6ff; color: #fff; 
+      border: none; border-radius: 4px; cursor: pointer; margin-right: 8px;
+    }
+    .btn-danger { background: #ff4d4d; }
+    .btn-success { background: #4dff4d; color: #000; }
+    .actions { margin-top: 20px; }
+    .css-editor { display: none; margin-top: 15px; }
+    .css-editor.show { display: block; }
+    .toggle-css { 
+      display: inline-block; padding: 8px 16px; background: #666; color: #fff; 
+      border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;
+    }
+    .preview { 
+      margin-top: 20px; padding: 20px; background: #2a2a2a; border-radius: 4px;
+      min-height: 100px; position: relative;
+    }
+    .preview-text { text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Text Display Settings</h1>
+  
+  <form id="settingsForm">
+    <div class="form-group">
+      <label>Overlay Name</label>
+      <input type="text" id="name" required>
+    </div>
+
+    <div class="form-group">
+      <label>Text Content</label>
+      <textarea id="text" required></textarea>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>Duration (seconds)</label>
+        <input type="number" id="duration" min="1" value="30">
+      </div>
+      <div class="form-group">
+        <label>Font Size (px)</label>
+        <input type="number" id="fontSize" min="1" value="48">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>Font Color</label>
+        <input type="color" id="fontColor" value="#ffffff">
+      </div>
+      <div class="form-group">
+        <label>Background Color</label>
+        <input type="color" id="bgColor" value="#000000">
+        <label><input type="checkbox" id="bgTransparent" checked> Transparent</label>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>Outline Color</label>
+        <input type="color" id="outlineColor" value="#000000">
+        <label><input type="checkbox" id="outlineEnabled"> Enable Outline</label>
+      </div>
+      <div class="form-group">
+        <label>Outline Width (px)</label>
+        <input type="number" id="outlineWidth" min="0" max="20" value="2">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>Position X</label>
+        <input type="number" id="posX" value="100">
+      </div>
+      <div class="form-group">
+        <label>Position Y</label>
+        <input type="number" id="posY" value="100">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>Font</label>
+        <select id="font">
+          <option value="Arial">Arial</option>
+          <option value="Verdana">Verdana</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Courier New">Courier New</option>
+          <option value="Georgia">Georgia</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Show Timer</label>
+        <select id="showTimer">
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Text Align</label>
+        <select id="textAlign">
+          <option value="left">Left</option>
+          <option value="center" selected>Center</option>
+          <option value="right">Right</option>
+        </select>
+      </div>
+    </div>
+
+    <button type="button" class="toggle-css" onclick="toggleCSS()">Show CSS</button>
+    
+    <div class="css-editor" id="cssEditor">
+      <div class="form-group">
+        <label>Custom CSS</label>
+        <textarea id="customCSS" placeholder="Enter custom CSS..."></textarea>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn">Save</button>
+      <button type="button" class="btn btn-success" onclick="startOverlay()">Start</button>
+      <button type="button" class="btn btn-danger" onclick="stopOverlay()">Stop</button>
+      <button type="button" class="btn btn-danger" onclick="deleteOverlay()">Delete</button>
+    </div>
+  </form>
+
+  <div class="preview">
+    <h3>Preview</h3>
+    <div class="preview-text" id="previewText"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const overlayId = params.get('id');
+    let currentOverlay = null;
+
+    function toggleCSS() {
+      document.getElementById('cssEditor').classList.toggle('show');
+    }
+
+    function updatePreview() {
+      const text = document.getElementById('text').value;
+      const fontSize = document.getElementById('fontSize').value;
+      const fontColor = document.getElementById('fontColor').value;
+      const font = document.getElementById('font').value;
+      const textAlign = document.getElementById('textAlign').value;
+      const outlineEnabled = document.getElementById('outlineEnabled').checked;
+      const outlineColor = document.getElementById('outlineColor').value;
+      const outlineWidth = document.getElementById('outlineWidth').value;
+      const bgTransparent = document.getElementById('bgTransparent').checked;
+      const bgColor = document.getElementById('bgColor').value;
+      
+      const preview = document.getElementById('previewText');
+      preview.textContent = text;
+      preview.style.fontSize = fontSize + 'px';
+      preview.style.color = fontColor;
+      preview.style.fontFamily = font;
+      preview.style.textAlign = textAlign;
+      
+      if (outlineEnabled) {
+        preview.style.textShadow = `
+          -${outlineWidth}px -${outlineWidth}px 0 ${outlineColor},
+          ${outlineWidth}px -${outlineWidth}px 0 ${outlineColor},
+          -${outlineWidth}px ${outlineWidth}px 0 ${outlineColor},
+          ${outlineWidth}px ${outlineWidth}px 0 ${outlineColor}
+        `;
+      } else {
+        preview.style.textShadow = 'none';
+      }
+      
+      if (!bgTransparent) {
+        preview.style.backgroundColor = bgColor;
+      } else {
+        preview.style.backgroundColor = 'transparent';
+      }
+    }
+
+    document.querySelectorAll('input, textarea, select').forEach(el => {
+      el.addEventListener('input', updatePreview);
+    });
+
+    async function loadOverlay() {
+      if (!overlayId) return;
+      const res = await fetch('/api/text/' + overlayId);
+      if (!res.ok) return;
+      currentOverlay = await res.json();
+      
+      document.getElementById('name').value = currentOverlay.name;
+      document.getElementById('text').value = currentOverlay.text;
+      document.getElementById('duration').value = currentOverlay.duration;
+      document.getElementById('fontSize').value = currentOverlay.fontSize;
+      document.getElementById('fontColor').value = currentOverlay.fontColor;
+      document.getElementById('posX').value = currentOverlay.position.x;
+      document.getElementById('posY').value = currentOverlay.position.y;
+      document.getElementById('font').value = currentOverlay.font;
+      document.getElementById('showTimer').value = currentOverlay.showTimer.toString();
+      document.getElementById('textAlign').value = currentOverlay.textAlign || 'center';
+      document.getElementById('outlineColor').value = currentOverlay.outlineColor || '#000000';
+      document.getElementById('outlineEnabled').checked = currentOverlay.outlineEnabled || false;
+      document.getElementById('outlineWidth').value = currentOverlay.outlineWidth || 2;
+      document.getElementById('customCSS').value = currentOverlay.customCSS || '';
+      
+      if (currentOverlay.backgroundColor !== 'transparent') {
+        document.getElementById('bgTransparent').checked = false;
+        document.getElementById('bgColor').value = currentOverlay.backgroundColor;
+      }
+      
+      updatePreview();
+    }
+
+    document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = {
+        name: document.getElementById('name').value,
+        text: document.getElementById('text').value,
+        duration: parseInt(document.getElementById('duration').value),
+        fontSize: parseInt(document.getElementById('fontSize').value),
+        fontColor: document.getElementById('fontColor').value,
+        backgroundColor: document.getElementById('bgTransparent').checked 
+          ? 'transparent' 
+          : document.getElementById('bgColor').value,
+        position: { 
+          x: parseInt(document.getElementById('posX').value), 
+          y: parseInt(document.getElementById('posY').value) 
+        },
+        font: document.getElementById('font').value,
+        showTimer: document.getElementById('showTimer').value === 'true',
+        textAlign: document.getElementById('textAlign').value,
+        outlineColor: document.getElementById('outlineColor').value,
+        outlineEnabled: document.getElementById('outlineEnabled').checked,
+        outlineWidth: parseInt(document.getElementById('outlineWidth').value),
+        customCSS: document.getElementById('customCSS').value
+      };
+
+      if (overlayId) {
+        await fetch('/api/text/' + overlayId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+      } else {
+        const res = await fetch('/api/text/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const newOverlay = await res.json();
+        window.location.href = '/text-display?id=' + newOverlay.id;
+        return;
+      }
+      alert('Saved!');
+    });
+
+    async function startOverlay() {
+      if (!overlayId) return alert('Save first');
+      await fetch('/api/text/' + overlayId + '/start', { method: 'POST' });
+      alert('Started!');
+    }
+
+    async function stopOverlay() {
+      if (!overlayId) return;
+      await fetch('/api/text/' + overlayId + '/stop', { method: 'POST' });
+      alert('Stopped!');
+    }
+
+    async function deleteOverlay() {
+      if (!overlayId) return;
+      if (!confirm('Delete this overlay?')) return;
+      await fetch('/api/text/' + overlayId, { method: 'DELETE' });
+      window.location.href = '/console';
+    }
+
+    loadOverlay();
+    updatePreview();
+  </script>
+</body>
+</html>

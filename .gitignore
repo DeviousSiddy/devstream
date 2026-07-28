@@ -141,3 +141,12 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# DevStream runtime data
+data/*.json
+
+# DevStream development notes
+ai_companion_notes.md
+ds_notes.md
+plan.md
+usage.md
