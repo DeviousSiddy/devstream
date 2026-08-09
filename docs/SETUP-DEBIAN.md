@@ -17,10 +17,8 @@ containers (devstream builds `node:20-alpine`, bot builds `python:3.12-slim` + c
    group (installer option) — the agent's `sudo` steps need it.
 2. Install opencode on the machine.
 3. Provide OneDrive access — needed for the secrets (`.env`, `OAUTH.txt`) that are **not in git**.
-   Choose one:
-   - **Option A (recommended, scriptable):** `sudo apt-get install -y rclone`, then
-     `rclone config` → create a remote named `onedrive` (browser OAuth login as DeviousSiddy).
-   - **Option B (manual):** in a browser, download from onedrive.com:
+   Follow `SETUP-ONEDRIVE-DEBIAN.md` (in the `reinstall-backup/` folder): rclone is recommended.
+   If you skip OneDrive setup, manually download from onedrive.com:
      - `reinstall-backup/ssh-gitconfig-2026-08-08.zip` (SSH keys + `.gitconfig`)
      - `reinstall-backup/MIGRATION-DEBIAN.md` and `SETUP-DEBIAN.md`
      - `devstream/.env`
