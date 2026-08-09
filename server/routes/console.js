@@ -92,14 +92,41 @@ function renderGodgamerRow(session) {
   `;
 }
 
+function renderCanvasRow(overlay) {
+  let status = 'Inactive';
+  let statusClass = '';
+  if (overlay.isActive) {
+    status = 'Active';
+    statusClass = 'status-active';
+  }
+
+  const preview = `${overlay.gridWidth || 32}x${overlay.gridHeight || 32} @ ${overlay.displaySize || 300}px`;
+
+  return `
+    <tr>
+      <td>${overlay.name}</td>
+      <td>${preview} (${overlay.stateFile})</td>
+      <td class="${statusClass}">${status}</td>
+      <td>
+        <a href="/canvas-display?id=${overlay.id}">Settings</a>
+        <button class="btn btn-sm" onclick="toggleCanvasOverlay('${overlay.id}', ${!overlay.isActive})">${overlay.isActive ? 'Stop' : 'Start'}</button>
+        <button class="btn btn-sm btn-secondary" onclick="duplicateCanvasOverlay('${overlay.id}')">Duplicate</button>
+        <button class="btn btn-sm btn-stop" onclick="deleteCanvasOverlay('${overlay.id}', '${overlay.name}')">Delete</button>
+      </td>
+    </tr>
+  `;
+}
+
 function renderConsole() {
   const textOverlays = load('text-overlays');
   const scrollOverlays = load('scroll-overlays');
   const godgamerSessions = load('godgamer-sessions');
+  const canvasOverlays = load('canvas-overlays');
   
   const textRows = textOverlays.map(renderTextRow).join('');
   const scrollRows = scrollOverlays.map(renderScrollRow).join('');
   const godgamerRows = godgamerSessions.map(renderGodgamerRow).join('');
+  const canvasRows = canvasOverlays.map(renderCanvasRow).join('');
 
   return `<!DOCTYPE html>
 <html>
@@ -124,6 +151,9 @@ function renderConsole() {
     .btn-secondary { background: #666; }
     .btn-secondary:hover { background: #777; }
     .section { margin-bottom: 30px; }
+    .bot-control { display: inline-block; margin-left: 10px; margin-bottom: 10px; font-size: 13px; }
+    .bot-control button { margin-right: 8px; vertical-align: middle; }
+    .bot-control span { vertical-align: middle; color: #aaa; }
     .overlay-size { 
       margin-bottom: 20px; padding: 15px; background: #2a2a2a; border-radius: 4px;
     }
@@ -160,6 +190,7 @@ function renderConsole() {
     <a href="/text-display" class="module-option">Text Display</a>
     <a href="/scroll-display" class="module-option">Scrolling Text</a>
     <a href="/godgamer-display" class="module-option">God Gamer Challenge</a>
+    <a href="/canvas-display" class="module-option">Canvas Overlay</a>
     <button class="btn btn-stop" onclick="hideModulePicker()" style="margin-left: 10px;">Cancel</button>
   </div>
 
@@ -195,6 +226,22 @@ function renderConsole() {
       </thead>
       <tbody id="godgamerTable">
         ${godgamerRows || '<tr><td colspan="5">No sessions yet</td></tr>'}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Canvas Overlays</h2>
+    <div class="bot-control">
+      <button id="botToggleBtn" class="btn btn-sm" onclick="toggleBot()" disabled>Start Bot</button>
+      <span id="botStatusText">Checking bot status...</span>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Preview</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="canvasTable">
+        ${canvasRows || '<tr><td colspan="4">No canvases yet</td></tr>'}
       </tbody>
     </table>
   </div>
@@ -268,6 +315,56 @@ function renderConsole() {
       refreshConsole();
     }
 
+    async function toggleCanvasOverlay(id, activate) {
+      const endpoint = activate 
+        ? '/api/canvas/' + id + '/start'
+        : '/api/canvas/' + id + '/stop';
+      await fetch(endpoint, { method: 'POST' });
+      refreshConsole();
+    }
+
+    async function duplicateCanvasOverlay(id) {
+      const res = await fetch('/api/canvas/' + id + '/duplicate', { method: 'POST' });
+      const newOverlay = await res.json();
+      window.location.href = '/canvas-display?id=' + newOverlay.id;
+    }
+
+    async function deleteCanvasOverlay(id, name) {
+      if (!confirm('Delete "' + name + '"?')) return;
+      await fetch('/api/canvas/' + id, { method: 'DELETE' });
+      refreshConsole();
+    }
+
+    let botRunning = false;
+
+    async function updateBotStatus() {
+      try {
+        const res = await fetch('/api/canvas/bot/status');
+        const data = await res.json();
+        const btn = document.getElementById('botToggleBtn');
+        const status = document.getElementById('botStatusText');
+        if (!data.available) {
+          btn.disabled = true;
+          btn.textContent = 'Start Bot';
+          status.textContent = 'Bot unavailable: ' + (data.error || 'unknown');
+          return;
+        }
+        botRunning = data.running;
+        btn.disabled = false;
+        btn.textContent = botRunning ? 'Stop Bot' : 'Start Bot';
+        status.textContent = botRunning ? 'Bot: Running' : 'Bot: Stopped';
+      } catch (e) {}
+    }
+
+    async function toggleBot() {
+      const btn = document.getElementById('botToggleBtn');
+      btn.disabled = true;
+      try {
+        await fetch('/api/canvas/bot/' + (botRunning ? 'stop' : 'start'), { method: 'POST' });
+      } catch (e) {}
+      updateBotStatus();
+    }
+
     async function refreshConsole() {
       try {
         const res = await fetch('/console/render');
@@ -275,7 +372,9 @@ function renderConsole() {
         document.getElementById('textTable').innerHTML = data.textRows || '<tr><td colspan="4">No overlays yet</td></tr>';
         document.getElementById('scrollTable').innerHTML = data.scrollRows || '<tr><td colspan="4">No overlays yet</td></tr>';
         document.getElementById('godgamerTable').innerHTML = data.godgamerRows || '<tr><td colspan="5">No sessions yet</td></tr>';
+        document.getElementById('canvasTable').innerHTML = data.canvasRows || '<tr><td colspan="4">No canvases yet</td></tr>';
       } catch (e) {}
+      updateBotStatus();
     }
 
     setInterval(refreshConsole, 2000);
@@ -292,12 +391,14 @@ router.get('/console/render', (req, res) => {
   const textOverlays = load('text-overlays');
   const scrollOverlays = load('scroll-overlays');
   const godgamerSessions = load('godgamer-sessions');
+  const canvasOverlays = load('canvas-overlays');
   
   const textRows = textOverlays.map(renderTextRow).join('');
   const scrollRows = scrollOverlays.map(renderScrollRow).join('');
   const godgamerRows = godgamerSessions.map(renderGodgamerRow).join('');
+  const canvasRows = canvasOverlays.map(renderCanvasRow).join('');
   
-  res.json({ textRows, scrollRows, godgamerRows });
+  res.json({ textRows, scrollRows, godgamerRows, canvasRows });
 });
 
 module.exports = router;

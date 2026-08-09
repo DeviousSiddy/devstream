@@ -4,6 +4,12 @@
 
 DevStream is a modular OBS overlay system built with Node.js/Express, hosted in Docker. It uses a simple JSON file-based persistence layer and serves overlay content as browser sources for OBS.
 
+Compose runs two containers:
+- **devstream** - the Express overlay server (port 3000)
+- **pixel-canvas-bot** - the mini_pixel_canvas Python bot (Twitch/Discord/YouTube chat listeners for the canvas)
+
+The devstream container mounts the host Docker socket (`/var/run/docker.sock`) and uses `dockerode` to start/stop the `pixel-canvas-bot` container from the console / canvas settings pages.
+
 ## System Components
 
 ```
@@ -30,6 +36,17 @@ DevStream is a modular OBS overlay system built with Node.js/Express, hosted in 
 │                  │   data/*.json   │                    │
 │                  └─────────────────┘                    │
 └─────────────────────────────────────────────────────────┘
+```
+
+```
+┌─────────────────────────┐        ┌──────────────────────────┐
+│  devstream (port 3000)  │        │  pixel-canvas-bot        │
+│  ─────────────────────  │        │  (Python)                │
+│  serves /output /api/*  │        │  Twitch/Discord/YT chat  │
+└───────────┬─────────────┘        └────────────┬─────────────┘
+            │ Docker socket (dockerode)          │ shares canvas
+            └─────────► start/stop container ◄───┘  state/palette
+                     (mounted /var/run/docker.sock)  via mounted folder
 ```
 
 ## Request Flow
@@ -69,6 +86,7 @@ Console (/console)
 - `server/routes/api.js` - REST API for text overlays + duplicate
 - `server/routes/scroll.js` - REST API for scroll overlays + duplicate
 - `server/routes/godgamer.js` - REST API for God Gamer sessions, players, games DB, TGDB search, finish, duplicate
+- `server/routes/canvas.js` - REST API for canvas overlays + bot start/stop via dockerode
 - `server/routes/console.js` - Console page (all modules)
 - `server/routes/output.js` - OBS output page (all modules)
 - `server/routes/debug.js` - Debug interface
@@ -78,6 +96,8 @@ Console (/console)
 - `public/text-display.html` - Settings page for text overlays
 - `public/scroll-display.html` - Settings page for scroll overlays
 - `public/godgamer-display.html` - Settings page for God Gamer sessions
+- `public/canvas-display.html` - Settings page for canvas overlays (+ bot Start/Stop)
+- `public/canvas-client.js` - Canvas renderer shared by output + preview
 
 ### Data Files
 
@@ -86,6 +106,7 @@ Console (/console)
 - `data/godgamer-sessions.json` - God Gamer sessions with game history
 - `data/godgamer-players.json` - Player records
 - `data/godgamer-games.json` - Local game database (cached from TGDB)
+- `data/canvas-overlays.json` - Canvas overlay configurations (also read by the bot for the active YouTube chat link)
 
 ## Key Design Decisions
 
@@ -125,6 +146,14 @@ Timers use a `data-started` timestamp and calculate remaining time client-side:
 - Client calculates `remaining = duration - (Date.now() - startedAt) / 1000`
 - Timer updates every second via `setInterval`
 - Overlay hidden when timer expires
+
+### 5. Bot Control via Docker Socket
+
+DevStream starts/stops the `pixel-canvas-bot` container by talking to the Docker socket mounted at `/var/run/docker.sock` using `dockerode`:
+- DevStream cannot spawn host processes, so containerizing the bot is the chosen control path
+- `GET /api/canvas/bot/status` inspects the container; `POST .../start` and `POST .../stop` call `container.start()` / `container.stop()`
+- `docker stop` is an explicit stop, so the bot's `restart: always` policy does not fight the UI control
+- If the socket/container is unavailable, the API reports `available: false` and the UI disables the buttons
 
 ## Module System
 

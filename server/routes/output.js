@@ -2,14 +2,26 @@ const express = require('express');
 const router = express.Router();
 const { load } = require('../store');
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function renderOverlays() {
+  const DEFAULT_INSTRUCTION = 'Mini Pixel Canvas 32x32\n!pixel x,y,## (5 sec cooldown)\n## = 2 digits (00-63) for color';
   const textOverlays = load('text-overlays');
   const scrollOverlays = load('scroll-overlays');
   const godgamerSessions = load('godgamer-sessions');
+  const canvasOverlays = load('canvas-overlays');
   
   const activeTextOverlays = textOverlays.filter(o => o.isActive);
   const activeScrollOverlays = scrollOverlays.filter(o => o.isActive);
   const activeGodgamer = godgamerSessions.filter(s => s.isActive || s.isFinished);
+  const activeCanvas = canvasOverlays.filter(o => o.isActive);
 
   const textHtml = activeTextOverlays.map(overlay => {
     let timerOutlineStyle = '';
@@ -127,7 +139,40 @@ function renderOverlays() {
     `;
   }).join('');
 
-  return textHtml + scrollHtml + godgamerHtml;
+  const canvasHtml = activeCanvas.map(overlay => {
+    const opacity = overlay.opacity ?? 0.5;
+    const position = overlay.position || { x: 1600, y: 300 };
+    const enlargedPos = overlay.enlargedPosition || { x: 500, y: 50 };
+    const titleHtml = overlay.showTitle
+      ? `<div class="canvas-title">${escapeHtml(overlay.titleText || 'Mini Pixel Canvas')}</div>`
+      : '';
+    const instructionText = overlay.instructionText || DEFAULT_INSTRUCTION;
+    const instructionHtml = overlay.showInstruction !== false && instructionText
+      ? `<div class="canvas-instruction">${escapeHtml(instructionText)}</div>`
+      : '';
+
+    return `
+      <div class="canvas-overlay" id="canvas-${overlay.id}"
+        style="left:${position.x}px; bottom:${position.y}px; opacity:${opacity};"
+        data-state-url="/api/canvas/${overlay.id}/pixels"
+        data-palette-url="/api/canvas/${overlay.id}/palette"
+        data-grid-width="${overlay.gridWidth || 32}"
+        data-grid-height="${overlay.gridHeight || 32}"
+        data-display-size="${overlay.displaySize || 300}"
+        data-enlarged-size="${overlay.enlargedSize || 900}"
+        data-enlarged-left="${enlargedPos.x}"
+        data-enlarged-bottom="${enlargedPos.y}"
+        data-fade-opacity="${opacity}"
+        data-enlarge-on-click="${overlay.enlargeOnClick !== false ? 'true' : 'false'}">
+        ${instructionHtml}
+        ${titleHtml}
+        <div class="canvas-grid"></div>
+        <style>${overlay.customCSS || ''}</style>
+      </div>
+    `;
+  }).join('');
+
+  return textHtml + scrollHtml + godgamerHtml + canvasHtml;
 }
 
 function formatDuration(seconds) {
@@ -237,10 +282,36 @@ router.get('/output', (req, res) => {
       font-size: 0.8em;
       opacity: 0.7;
     }
+    .canvas-overlay {
+      position: absolute;
+    }
+    .canvas-overlay .canvas-grid {
+      display: grid;
+    }
+    .canvas-overlay .canvas-title {
+      text-align: center;
+      background: rgba(0, 0, 0, 0.5);
+      opacity: 0.5;
+      margin-bottom: 8px;
+      font-family: sans-serif;
+      color: #eee;
+      font-size: 1.2em;
+    }
+    .canvas-overlay .canvas-instruction {
+      text-align: center;
+      background: rgba(0, 0, 0, 0.5);
+      opacity: 0.5;
+      margin-bottom: 8px;
+      font-family: sans-serif;
+      color: #eee;
+      font-size: 1.2em;
+      white-space: pre-line;
+    }
   </style>
 </head>
 <body>
   <div id="overlays">${renderOverlays()}</div>
+  <script src="/canvas-client.js"></script>
   <script>
     function updateTimers() {
       document.querySelectorAll('.timer').forEach(timer => {
@@ -331,8 +402,10 @@ router.get('/output', (req, res) => {
         if (html !== lastHtml) {
           lastHtml = html;
           const overlays = document.getElementById('overlays');
+          destroyCanvasOverlays(overlays);
           overlays.innerHTML = html;
           scrollWidths = {};
+          initCanvasOverlays();
         }
         updateTimers();
       } catch (e) {}
@@ -346,6 +419,7 @@ router.get('/output', (req, res) => {
     }
     updateTimers();
     animationLoop();
+    initCanvasOverlays();
   </script>
 </body>
 </html>`);

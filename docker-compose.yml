@@ -1,13 +1,32 @@
-version: '3.8'
-
 services:
   devstream:
     build: .
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     volumes:
       - ./data:/app/data
       - ./server:/app/server
+      - ${CANVAS_SOURCE_HOST:-}:/app/canvas-source:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - PORT=3000
+      - BOT_CONTAINER_NAME=pixel-canvas-bot
     restart: unless-stopped
+
+  pixel-canvas-bot:
+    build:
+      context: ${CANVAS_SOURCE_HOST:-.}
+      dockerfile: Dockerfile
+    container_name: pixel-canvas-bot
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DEVSTREAM_DATA_DIR=/app-data
+      - CHROMEDRIVER_PATH=/usr/bin/chromedriver
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ${CANVAS_SOURCE_HOST:-.}:/app
+      - ./data:/app-data

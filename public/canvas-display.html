@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Canvas Overlay Settings</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: #fff; }
+    h1 { margin-bottom: 20px; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input, textarea, select { 
+      width: 100%; padding: 8px; background: #333; border: 1px solid #555; 
+      color: #fff; border-radius: 4px;
+    }
+    textarea { min-height: 80px; font-family: monospace; }
+    .row { display: flex; gap: 15px; }
+    .row .form-group { flex: 1; }
+    .btn { 
+      display: inline-block; padding: 10px 20px; background: #4da6ff; color: #fff; 
+      border: none; border-radius: 4px; cursor: pointer; margin-right: 8px;
+    }
+    .btn-danger { background: #ff4d4d; }
+    .btn-success { background: #4dff4d; color: #000; }
+    .actions { margin-top: 20px; }
+    .css-editor { display: none; margin-top: 15px; }
+    .css-editor.show { display: block; }
+    .toggle-css { 
+      display: inline-block; padding: 8px 16px; background: #666; color: #fff; 
+      border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;
+    }
+    .checkbox-row { display: flex; gap: 20px; margin-bottom: 15px; flex-wrap: wrap; }
+    .checkbox-row label { display: inline-flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer; }
+    .checkbox-row input[type="checkbox"] { width: auto; }
+    .preview { 
+      margin-top: 20px; padding: 20px; background: #2a2a2a; border-radius: 4px;
+      min-height: 100px; position: relative;
+    }
+    .bot-control { margin-bottom: 20px; font-size: 14px; }
+    .bot-control button { vertical-align: middle; padding: 8px 16px; }
+    .bot-control span { vertical-align: middle; color: #aaa; margin-right: 10px; }
+    .preview .canvas-overlay {
+      position: relative;
+      width: 300px;
+    }
+    .preview .canvas-title {
+      text-align: center;
+      background: rgba(0, 0, 0, 0.5);
+      opacity: 0.5;
+      margin-bottom: 8px;
+      font-size: 1.2em;
+      color: #eee;
+    }
+    .preview .canvas-instruction {
+      text-align: center;
+      background: rgba(0, 0, 0, 0.5);
+      opacity: 0.5;
+      margin-bottom: 8px;
+      font-size: 1.2em;
+      color: #eee;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
+  <h1>Canvas Overlay Settings</h1>
+
+  <div class="bot-control">
+    <span id="botStatusText">Checking bot status...</span>
+    <button id="botToggleBtn" class="btn" onclick="toggleBot()" disabled>Start Bot</button>
+  </div>
+  
+  <form id="settingsForm">
+    <div class="form-group">
+      <label>Overlay Name</label>
+      <input type="text" id="name" required>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>Position X (left, px)</label>
+        <input type="number" id="posX" value="1600">
+      </div>
+      <div class="form-group">
+        <label>Position Y (from bottom, px)</label>
+        <input type="number" id="posY" value="300">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Opacity: <span id="opacityValue">50</span>%</label>
+      <input type="range" id="opacity" min="0" max="100" value="50" style="width:100%">
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>State File</label>
+        <input type="text" id="stateFile" value="canvas_state.json">
+      </div>
+      <div class="form-group">
+        <label>Palette File</label>
+        <input type="text" id="paletteFile" value="pallette.json">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>Grid Width</label>
+        <input type="number" id="gridWidth" min="1" value="32">
+      </div>
+      <div class="form-group">
+        <label>Grid Height</label>
+        <input type="number" id="gridHeight" min="1" value="32">
+      </div>
+      <div class="form-group">
+        <label>Display Size (px)</label>
+        <input type="number" id="displaySize" min="50" value="300">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>Large Size (px)</label>
+        <input type="number" id="enlargedSize" min="100" value="900">
+      </div>
+      <div class="form-group">
+        <label>Large Position X (left, px)</label>
+        <input type="number" id="enlargedPosX" value="500">
+      </div>
+      <div class="form-group">
+        <label>Large Position Y (from bottom, px)</label>
+        <input type="number" id="enlargedPosY" value="50">
+      </div>
+    </div>
+
+    <div class="checkbox-row">
+      <label><input type="checkbox" id="showTitle"> Show Title</label>
+      <label><input type="checkbox" id="enlargeOnClick" checked> Enlarge on Click</label>
+      <label><input type="checkbox" id="showInstruction" checked> Show Instructions</label>
+    </div>
+
+    <div class="form-group">
+      <label>Title Text</label>
+      <input type="text" id="titleText" value="Mini Pixel Canvas">
+    </div>
+
+    <div class="form-group">
+      <label>Instructions (how to interact with the canvas)</label>
+      <textarea id="instructionText">Mini Pixel Canvas 32x32
+!pixel x,y,## (5 sec cooldown)
+## = 2 digits (00-63) for color</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>YouTube Chat Link (for pixel placement, used by the canvas bot)</label>
+      <input type="text" id="youtubeChatLink" placeholder="https://www.youtube.com/live/...">
+    </div>
+
+    <button type="button" class="toggle-css" onclick="toggleCSS()">Show CSS</button>
+    
+    <div class="css-editor" id="cssEditor">
+      <div class="form-group">
+        <label>Custom CSS</label>
+        <textarea id="customCSS" placeholder="Enter custom CSS..."></textarea>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn">Save</button>
+      <button type="button" class="btn btn-success" onclick="startOverlay()">Start</button>
+      <button type="button" class="btn btn-danger" onclick="stopOverlay()">Stop</button>
+      <button type="button" class="btn btn-danger" onclick="deleteOverlay()">Delete</button>
+    </div>
+  </form>
+
+  <div class="preview">
+    <h3>Preview</h3>
+    <div class="canvas-overlay" id="previewOverlay">
+      <div class="canvas-instruction" id="previewInstruction">Mini Pixel Canvas 32x32
+!pixel x,y,## (5 sec cooldown)
+## = 2 digits (00-63) for color</div>
+      <div class="canvas-title" id="previewTitle">Mini Pixel Canvas</div>
+      <div class="canvas-grid" id="previewGrid"></div>
+    </div>
+  </div>
+
+  <script src="/canvas-client.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const overlayId = params.get('id');
+    let currentOverlay = null;
+    let previewHandle = null;
+
+    function toggleCSS() {
+      document.getElementById('cssEditor').classList.toggle('show');
+    }
+
+    let botRunning = false;
+
+    async function updateBotStatus() {
+      try {
+        const res = await fetch('/api/canvas/bot/status');
+        const data = await res.json();
+        const btn = document.getElementById('botToggleBtn');
+        const status = document.getElementById('botStatusText');
+        if (!data.available) {
+          btn.disabled = true;
+          btn.textContent = 'Start Bot';
+          status.textContent = 'Bot unavailable: ' + (data.error || 'unknown');
+          return;
+        }
+        botRunning = data.running;
+        btn.disabled = false;
+        btn.textContent = botRunning ? 'Stop Bot' : 'Start Bot';
+        status.textContent = botRunning ? 'Bot: Running' : 'Bot: Stopped';
+      } catch (e) {}
+    }
+
+    async function toggleBot() {
+      const btn = document.getElementById('botToggleBtn');
+      btn.disabled = true;
+      try {
+        await fetch('/api/canvas/bot/' + (botRunning ? 'stop' : 'start'), { method: 'POST' });
+      } catch (e) {}
+      updateBotStatus();
+    }
+
+    function updatePreviewCanvas() {
+      if (previewHandle) { previewHandle.destroy(); previewHandle = null; }
+      const grid = document.getElementById('previewGrid');
+      grid.innerHTML = '';
+      document.getElementById('previewGrid').removeAttribute('style');
+      document.getElementById('previewOverlay').removeAttribute('style');
+
+      const stateFile = document.getElementById('stateFile').value;
+      const paletteFile = document.getElementById('paletteFile').value;
+
+      const titleEl = document.getElementById('previewTitle');
+      const showTitle = document.getElementById('showTitle').checked;
+      titleEl.style.display = showTitle ? '' : 'none';
+      titleEl.textContent = document.getElementById('titleText').value || 'Mini Pixel Canvas';
+
+      const instructionEl = document.getElementById('previewInstruction');
+      instructionEl.style.display = document.getElementById('showInstruction').checked ? '' : 'none';
+      instructionEl.textContent = document.getElementById('instructionText').value;
+
+      previewHandle = initCanvas(grid, {
+        stateUrl: '/api/canvas/preview/pixels?file=' + encodeURIComponent(stateFile),
+        paletteUrl: '/api/canvas/preview/palette?file=' + encodeURIComponent(paletteFile),
+        width: parseInt(document.getElementById('gridWidth').value) || 32,
+        height: parseInt(document.getElementById('gridHeight').value) || 32,
+        displaySize: parseInt(document.getElementById('displaySize').value) || 300,
+        enlargedSize: parseInt(document.getElementById('enlargedSize').value) || 900,
+        enlargedLeft: parseInt(document.getElementById('enlargedPosX').value),
+        enlargedBottom: parseInt(document.getElementById('enlargedPosY').value),
+        enlargeOnClick: document.getElementById('enlargeOnClick').checked
+      });
+    }
+
+    document.getElementById('opacity').addEventListener('input', (e) => {
+      document.getElementById('opacityValue').textContent = e.target.value;
+    });
+
+    ['stateFile', 'paletteFile', 'gridWidth', 'gridHeight', 'displaySize', 'enlargedSize', 'enlargedPosX', 'enlargedPosY', 'titleText', 'instructionText'].forEach(id => {
+      document.getElementById(id).addEventListener('change', updatePreviewCanvas);
+    });
+    ['showTitle', 'enlargeOnClick', 'showInstruction'].forEach(id => {
+      document.getElementById(id).addEventListener('change', updatePreviewCanvas);
+    });
+
+    async function loadOverlay() {
+      if (!overlayId) return;
+      const res = await fetch('/api/canvas/' + overlayId);
+      if (!res.ok) return;
+      currentOverlay = await res.json();
+      
+      document.getElementById('name').value = currentOverlay.name;
+      document.getElementById('posX').value = currentOverlay.position.x;
+      document.getElementById('posY').value = currentOverlay.position.y;
+      document.getElementById('stateFile').value = currentOverlay.stateFile || 'canvas_state.json';
+      document.getElementById('paletteFile').value = currentOverlay.paletteFile || 'pallette.json';
+      document.getElementById('gridWidth').value = currentOverlay.gridWidth || 32;
+      document.getElementById('gridHeight').value = currentOverlay.gridHeight || 32;
+      document.getElementById('displaySize').value = currentOverlay.displaySize || 300;
+      document.getElementById('enlargedSize').value = currentOverlay.enlargedSize || 900;
+      document.getElementById('enlargedPosX').value = (currentOverlay.enlargedPosition || {}).x ?? 500;
+      document.getElementById('enlargedPosY').value = (currentOverlay.enlargedPosition || {}).y ?? 50;
+      document.getElementById('showTitle').checked = currentOverlay.showTitle || false;
+      document.getElementById('enlargeOnClick').checked = currentOverlay.enlargeOnClick !== false;
+      document.getElementById('showInstruction').checked = currentOverlay.showInstruction !== false;
+      document.getElementById('titleText').value = currentOverlay.titleText || 'Mini Pixel Canvas';
+      document.getElementById('instructionText').value = currentOverlay.instructionText || 'Mini Pixel Canvas 32x32\n!pixel x,y,## (5 sec cooldown)\n## = 2 digits (00-63) for color';
+      document.getElementById('youtubeChatLink').value = currentOverlay.youtubeChatLink || '';
+      document.getElementById('customCSS').value = currentOverlay.customCSS || '';
+      document.getElementById('opacity').value = (currentOverlay.opacity ?? 0.5) * 100;
+      document.getElementById('opacityValue').textContent = Math.round((currentOverlay.opacity ?? 0.5) * 100).toString();
+
+      updatePreviewCanvas();
+    }
+
+    document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = {
+        name: document.getElementById('name').value,
+        position: { 
+          x: parseInt(document.getElementById('posX').value), 
+          y: parseInt(document.getElementById('posY').value) 
+        },
+        enlargedPosition: {
+          x: parseInt(document.getElementById('enlargedPosX').value),
+          y: parseInt(document.getElementById('enlargedPosY').value)
+        },
+        enlargedSize: parseInt(document.getElementById('enlargedSize').value),
+        stateFile: document.getElementById('stateFile').value,
+        paletteFile: document.getElementById('paletteFile').value,
+        gridWidth: parseInt(document.getElementById('gridWidth').value),
+        gridHeight: parseInt(document.getElementById('gridHeight').value),
+        displaySize: parseInt(document.getElementById('displaySize').value),
+        showTitle: document.getElementById('showTitle').checked,
+        enlargeOnClick: document.getElementById('enlargeOnClick').checked,
+        showInstruction: document.getElementById('showInstruction').checked,
+        titleText: document.getElementById('titleText').value,
+        instructionText: document.getElementById('instructionText').value,
+        youtubeChatLink: document.getElementById('youtubeChatLink').value,
+        customCSS: document.getElementById('customCSS').value,
+        opacity: document.getElementById('opacity').value / 100
+      };
+
+      if (overlayId) {
+        await fetch('/api/canvas/' + overlayId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+      } else {
+        const res = await fetch('/api/canvas/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const newOverlay = await res.json();
+        window.location.href = '/canvas-display?id=' + newOverlay.id;
+        return;
+      }
+      alert('Saved!');
+    });
+
+    async function startOverlay() {
+      if (!overlayId) return alert('Save first');
+      await fetch('/api/canvas/' + overlayId + '/start', { method: 'POST' });
+      alert('Started!');
+    }
+
+    async function stopOverlay() {
+      if (!overlayId) return;
+      await fetch('/api/canvas/' + overlayId + '/stop', { method: 'POST' });
+      alert('Stopped!');
+    }
+
+    async function deleteOverlay() {
+      if (!overlayId) return;
+      if (!confirm('Delete this overlay?')) return;
+      await fetch('/api/canvas/' + overlayId, { method: 'DELETE' });
+      window.location.href = '/console';
+    }
+
+    updatePreviewCanvas();
+    loadOverlay();
+    updateBotStatus();
+    setInterval(updateBotStatus, 5000);
+  </script>
+</body>
+</html>
