@@ -58,6 +58,18 @@ Track gaming challenge sessions:
 - Finish Session: freezes timers, keeps overlay visible
 - Stop Session: ends session, hides overlay
 
+### Canvas Overlay
+
+Live pixel-art canvas for the stream (used with the mini_pixel_canvas bot):
+- 32x32 pixel grid (configurable size) served from a mounted source folder
+- Pixel change animations with author tags ([D]/[YT]/[T])
+- Hover pixels to see the author, click to enlarge
+- Configurable enlarged size and position when clicked
+- Bottom/left origin positioning, opacity fade
+- Optional instruction text (e.g. how to place pixels) shown above the canvas
+- YouTube Chat Link setting feeds the pixel bot's live-chat scraper (never rendered on the overlay)
+- **Start/Stop the pixel canvas bot** (Docker container) directly from the console or canvas settings page
+
 ## Quick Start
 
 ### 1. Get a TGDB API Key
@@ -80,6 +92,12 @@ PORT=3000
 ```bash
 docker-compose up -d
 ```
+
+This starts both services:
+- `devstream` - the overlay server (port 3000). The Docker socket is mounted into this container so it can control the bot.
+- `pixel-canvas-bot` - the mini_pixel_canvas Python bot (Twitch/Discord/YouTube chat listeners for the canvas). `CANVAS_SOURCE_HOST` (in `.env`) points compose at the bot's source folder.
+
+Start/Stop the bot from the Console (Canvas Overlays section) or the Canvas settings page.
 
 **Docker:**
 
@@ -107,6 +125,7 @@ Navigate to http://localhost:3000/console to manage your overlays.
 | Text Settings | `/text-display?id=<id>` | Configure text display overlay |
 | Scroll Settings | `/scroll-display?id=<id>` | Configure scrolling text overlay |
 | God Gamer Settings | `/godgamer-display?id=<id>` | Configure God Gamer session |
+| Canvas Settings | `/canvas-display?id=<id>` | Configure Canvas overlay |
 | Output | `/output` | Browser source URL for OBS |
 | Debug | `/debug` | Debug and testing interface |
 
@@ -116,6 +135,12 @@ Navigate to http://localhost:3000/console to manage your overlays.
 |----------|---------|-------------|
 | `PORT` | `3000` | Server port |
 | `TGDB_API_KEY` | - | TheGamesDB API key (required for God Gamer game search) |
+| `CANVAS_SOURCE_DIR` | `canvas-source/` | Folder with canvas_state.json / pallette.json (mounted in Docker) |
+| `CANVAS_SOURCE_HOST` | - | Host path to the mini_pixel_canvas folder (used by docker-compose to mount/build the bot) |
+| `DEVSTREAM_DATA_DIR` | - | Host path to DevStream's data folder (used by the pixel canvas bot) |
+| `DEVSTREAM_ENV_FILE` | - | Path to the shared DevStream .env (used by the pixel canvas bot) |
+| `DOCKER_SOCKET` | `/var/run/docker.sock` | Docker socket DevStream uses to start/stop the bot container |
+| `BOT_CONTAINER_NAME` | `pixel-canvas-bot` | Bot container DevStream controls for start/stop |
 
 ## OBS Setup
 
@@ -159,6 +184,22 @@ POST /api/godgamer/sessions/:id/games  # Add game to session
 POST /api/godgamer/sessions/:id/games/current/start # Start current game
 POST /api/godgamer/sessions/:id/games/current/end   # End current game (win/loss)
 POST /api/godgamer/sessions/:id/duplicate # Duplicate session
+
+# Canvas Overlay API
+GET /api/canvas                    # List canvases
+POST /api/canvas/create            # Create canvas
+PUT /api/canvas/:id                # Update canvas
+DELETE /api/canvas/:id             # Delete canvas
+POST /api/canvas/:id/start         # Show on output
+POST /api/canvas/:id/stop          # Hide from output
+GET /api/canvas/:id/pixels         # Get pixel state
+GET /api/canvas/:id/palette        # Get color palette
+POST /api/canvas/:id/duplicate     # Duplicate canvas
+
+# Canvas Bot Control (docker-compose only)
+GET  /api/canvas/bot/status        # Bot container status
+POST /api/canvas/bot/start         # Start the pixel-canvas-bot container
+POST /api/canvas/bot/stop          # Stop the pixel-canvas-bot container
 ```
 
 ## Project Structure
@@ -174,7 +215,8 @@ devstream/
 │   ├── scroll-overlays.json
 │   ├── godgamer-sessions.json
 │   ├── godgamer-players.json
-│   └── godgamer-games.json
+│   ├── godgamer-games.json
+│   └── canvas-overlays.json
 ├── docs/                   # Documentation
 │   ├── API.md
 │   ├── ARCHITECTURE.md
@@ -182,7 +224,9 @@ devstream/
 ├── public/
 │   ├── text-display.html   # Text settings page
 │   ├── scroll-display.html # Scroll settings page
-│   └── godgamer-display.html # God Gamer settings page
+│   ├── godgamer-display.html # God Gamer settings page
+│   ├── canvas-display.html # Canvas settings page
+│   └── canvas-client.js    # Canvas renderer (output + preview)
 └── server/
     ├── index.js            # Express server
     ├── store.js            # JSON file persistence
@@ -190,10 +234,13 @@ devstream/
         ├── api.js          # Text API endpoints
         ├── scroll.js       # Scroll API endpoints
         ├── godgamer.js     # God Gamer API endpoints
+        ├── canvas.js       # Canvas API endpoints (+ bot start/stop via dockerode)
         ├── console.js      # Console page
         ├── debug.js        # Debug interface
         └── output.js       # OBS output
 ```
+
+The `pixel-canvas-bot` is a separate container built from the mini_pixel_canvas source folder (see `CANVAS_SOURCE_HOST`). It has its own `Dockerfile`, `.dockerignore`, and `requirements-container.txt`.
 
 ## License
 

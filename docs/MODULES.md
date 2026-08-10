@@ -265,6 +265,89 @@ All modules share these features:
 
 ---
 
+## Canvas Overlay
+
+**Status:** Complete  
+**Settings:** `/canvas-display`  
+**API:** `/api/canvas/*`  
+**Complexity:** Medium
+
+### Features
+- Displays a live pixel-art canvas (32x32 default) as an OBS overlay
+- Pixel state and palette served from a mounted source folder (written by the mini_pixel_canvas bot)
+- Pixel change animation: red blink + author tag with source prefix ([D]/[YT]/[T])
+- Hover a pixel to show the author that placed it
+- Click the canvas to enlarge it (configurable size and position)
+- Optional instruction text (e.g. how to place pixels) shown above the canvas
+- Opacity fades to the configured value 5s after a pixel change
+- Bottom/left origin positioning (matches the original canvas layout)
+- Configurable state/palette file names, grid size, display size, and title
+- **YouTube Chat Link** setting: feeds the active link to the pixel canvas bot (which scrapes YouTube live chat with Selenium) — never rendered on the overlay
+- Standard overlay features: opacity, custom CSS, start/stop, duplicate
+
+### Settings
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| name | string | "Untitled Canvas" | Display name in console |
+| stateFile | string | "canvas_state.json" | Pixel state file in the source folder |
+| paletteFile | string | "pallette.json" | Color palette file in the source folder |
+| gridWidth | number | 32 | Grid width in pixels |
+| gridHeight | number | 32 | Grid height in pixels |
+| displaySize | number | 300 | Canvas display size in px |
+| enlargedSize | number | 900 | Canvas size when enlarged (px) |
+| position | object | {x: 1600, y: 300} | X (left) / Y (from bottom) in px |
+| enlargedPosition | object | {x: 500, y: 50} | Position when enlarged (left / from bottom) in px |
+| opacity | number | 0.5 | Opacity (0-1) |
+| showTitle | boolean | false | Show title above canvas |
+| titleText | string | "Mini Pixel Canvas" | Title text |
+| showInstruction | boolean | true | Show interaction instructions above the canvas |
+| instructionText | string | "Mini Pixel Canvas 32x32\n!pixel x,y,## (5 sec cooldown)\n## = 2 digits (00-63) for color" | Interaction instructions |
+| enlargeOnClick | boolean | true | Click canvas to enlarge |
+| youtubeChatLink | string | "" | YouTube live chat link for the pixel bot (not shown on overlay) |
+| customCSS | string | "" | Custom CSS injection |
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/canvas | List all canvases |
+| GET | /api/canvas/:id | Get single canvas |
+| POST | /api/canvas/create | Create new canvas |
+| PUT | /api/canvas/:id | Update canvas |
+| DELETE | /api/canvas/:id | Delete canvas |
+| POST | /api/canvas/:id/start | Show canvas on output |
+| POST | /api/canvas/:id/stop | Hide canvas |
+| GET | /api/canvas/:id/state | Get current config |
+| GET | /api/canvas/:id/pixels | Get pixel state (from stateFile) |
+| GET | /api/canvas/:id/palette | Get color palette (from paletteFile) |
+| GET | /api/canvas/preview/pixels?file= | Preview pixel state by file name |
+| GET | /api/canvas/preview/palette?file= | Preview palette by file name |
+| POST | /api/canvas/:id/duplicate | Duplicate canvas (numbered name) |
+| GET | /api/canvas/bot/status | Bot container status ({available, running}) |
+| POST | /api/canvas/bot/start | Start the pixel-canvas-bot container |
+| POST | /api/canvas/bot/stop | Stop the pixel-canvas-bot container |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| CANVAS_SOURCE_DIR | Folder mounted into the container with canvas_state.json / pallette.json |
+| CANVAS_SOURCE_HOST | Host path to the mini_pixel_canvas folder (compose interpolation) |
+| DEVSTREAM_DATA_DIR | Host path to DevStream's data folder (used by the pixel bot) |
+| DEVSTREAM_ENV_FILE | Path to the shared DevStream .env (used by the pixel bot) |
+| DOCKER_SOCKET | Path to the Docker socket DevStream uses to control the bot (default /var/run/docker.sock) |
+| BOT_CONTAINER_NAME | Container name DevStream controls for start/stop (default pixel-canvas-bot) |
+
+### Data Source
+- The mini_pixel_canvas Python bot writes `canvas_state.json`/`pallette.json` into its own folder
+- That folder is volume-mounted into the container as `CANVAS_SOURCE_DIR`
+- DevStream serves the files via `/api/canvas/:id/pixels` and `/api/canvas/:id/palette`
+- The bot reads its credentials from `py/bot/OAUTH.txt` (falling back to env vars) and the active canvas' YouTube chat link from `data/canvas-overlays.json`
+- **Bot control:** DevStream talks to the Docker socket (mounted at `/var/run/docker.sock`) to `start`/`stop` the `pixel-canvas-bot` container via dockerode; the console and canvas settings pages expose Start/Stop buttons.
+
+---
+
 ## Adding a New Module
 
 1. Create route file: `server/routes/{module-name}.js`

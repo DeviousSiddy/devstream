@@ -1,0 +1,7 @@
+.env
+node_modules
+data
+.git
+ai-notes
+docs
+*.md

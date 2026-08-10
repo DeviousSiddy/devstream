@@ -580,6 +580,224 @@ Creates a copy with an auto-incremented name (e.g., "God Gamer Session" -> "God 
 
 ---
 
+## Canvas Overlay API
+
+### Create Canvas
+
+```http
+POST /api/canvas/create
+Content-Type: application/json
+```
+
+**Request Body:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | string | "Untitled Canvas" | Display name |
+| `stateFile` | string | "canvas_state.json" | Pixel state file in the source folder |
+| `paletteFile` | string | "pallette.json" | Color palette file in the source folder |
+| `gridWidth` | number | 32 | Canvas width in cells |
+| `gridHeight` | number | 32 | Canvas height in cells |
+| `displaySize` | number | 300 | Canvas display size in px |
+| `enlargedSize` | number | 900 | Canvas size when enlarged (px) |
+| `enlargedPosX` | number | 500 | Enlarged canvas left position (px) |
+| `enlargedPosY` | number | 50 | Enlarged canvas bottom position (px) |
+| `enlargeOnClick` | boolean | true | Click canvas to enlarge |
+| `position` | object | {x: 1600, y: 300} | {x, y} position (y from bottom) |
+| `opacity` | number | 0.5 | Opacity (0-1) |
+| `backgroundColor` | string | "transparent" | Background color or "transparent" |
+| `showTitle` | boolean | false | Show title above canvas |
+| `titleText` | string | "Mini Pixel Canvas" | Title text |
+| `showInstruction` | boolean | true | Show interaction instructions above the canvas |
+| `instructionText` | string | "Mini Pixel Canvas 32x32\n!pixel x,y,## (5 sec cooldown)\n## = 2 digits (00-63) for color" | Interaction instructions |
+| `youtubeChatLink` | string | "" | YouTube chat link fed to the pixel bot (never rendered) |
+| `customCSS` | string | "" | Custom CSS injection |
+
+**Response:** Canvas object
+
+---
+
+### Get All Canvases
+
+```http
+GET /api/canvas
+```
+
+**Response:** Array of canvas objects
+
+---
+
+### Get Canvas
+
+```http
+GET /api/canvas/:id
+```
+
+**Response:** Single canvas object
+
+---
+
+### Get Canvas Config State
+
+```http
+GET /api/canvas/:id/state
+```
+
+Returns the current canvas config (used by the settings page).
+
+**Response:** Canvas object
+
+---
+
+### Update Canvas
+
+```http
+PUT /api/canvas/:id
+Content-Type: application/json
+```
+
+**Request Body:** Partial canvas object (only fields to update)
+
+**Response:** Updated canvas object
+
+---
+
+### Delete Canvas
+
+```http
+DELETE /api/canvas/:id
+```
+
+**Response:** `{ "success": true }`
+
+---
+
+### Show Canvas on Output
+
+```http
+POST /api/canvas/:id/start
+```
+
+Sets `isActive: true`.
+
+**Response:** Updated canvas object
+
+---
+
+### Hide Canvas from Output
+
+```http
+POST /api/canvas/:id/stop
+```
+
+Sets `isActive: false`.
+
+**Response:** Updated canvas object
+
+---
+
+### Get Pixel State
+
+```http
+GET /api/canvas/:id/pixels
+```
+
+Reads the pixel grid from the canvas' `stateFile` in the mounted source folder.
+
+**Response:** `{ grid: [...], width, height }`
+
+---
+
+### Get Color Palette
+
+```http
+GET /api/canvas/:id/palette
+```
+
+Reads the color palette from the canvas' `paletteFile` in the mounted source folder.
+
+**Response:** `{ colors: [...] }`
+
+---
+
+### Preview Pixel State
+
+```http
+GET /api/canvas/preview/pixels?file=canvas_state.json
+```
+
+Preview pixel state by file name (used by the settings page before saving).
+
+**Response:** `{ grid: [...], width, height }`
+
+---
+
+### Preview Color Palette
+
+```http
+GET /api/canvas/preview/palette?file=pallette.json
+```
+
+Preview palette by file name.
+
+**Response:** `{ colors: [...] }`
+
+---
+
+### Duplicate Canvas
+
+```http
+POST /api/canvas/:id/duplicate
+```
+
+Creates a copy with an auto-incremented name (e.g., "My Canvas" -> "My Canvas 2"). Sets `isActive: false`.
+
+**Response:** New canvas object
+
+---
+
+### Bot Status
+
+```http
+GET /api/canvas/bot/status
+```
+
+Checks the `pixel-canvas-bot` container through the Docker socket (dockerode).
+
+**Response:**
+
+```json
+{ "available": true, "running": true, "error": null }
+```
+
+`available` is `false` when the Docker socket or container is unreachable.
+
+---
+
+### Start Bot
+
+```http
+POST /api/canvas/bot/start
+```
+
+Starts the `pixel-canvas-bot` container (no-op if already running).
+
+**Response:** `{ "running": true }` (HTTP 409 with `{ "available": false }` if the socket/container is unavailable)
+
+---
+
+### Stop Bot
+
+```http
+POST /api/canvas/bot/stop
+```
+
+Stops the `pixel-canvas-bot` container (no-op if already stopped). Note: `docker stop` is an explicit stop, so the container's `restart: always` policy will not bring it back.
+
+**Response:** `{ "running": false }`
+
+---
+
 ## Output Endpoints
 
 ### Output Page (OBS Browser Source)
