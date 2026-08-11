@@ -113,7 +113,7 @@ function renderOverlays() {
         <div class="godgamer-game ${resultClass}">
           <span class="godgamer-number">${i + 1}.</span>
           ${imgHtml}
-          <span class="godgamer-name">${game.name}</span>
+          <span class="godgamer-name">${escapeHtml(game.displayName || game.name)}</span>
           ${resultText ? `<span class="godgamer-result ${resultClass}">${resultText}</span>` : ''}
           ${durationText ? `<span class="godgamer-duration">${durationText}</span>` : ''}
         </div>

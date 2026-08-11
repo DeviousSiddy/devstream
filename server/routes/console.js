@@ -75,12 +75,16 @@ function renderGodgamerRow(session) {
   const gamesPlayed = (session.games || []).filter(g => g.result).length;
   const totalGames = (session.games || []).length;
   const players = (session.playerNames || []).join(', ') || 'devioussiddy';
+  const currentGame = (session.games || [])[session.currentGameIndex];
+  const twitchInfo = currentGame && currentGame.twitchCategoryName
+    ? `<div style="color: #888; font-size: 12px;">Twitch: ${currentGame.twitchCategoryName}${currentGame.twitchSyncError ? ' (error)' : ''}</div>`
+    : '';
 
   return `
     <tr>
       <td>${session.name}</td>
       <td>${players}</td>
-      <td>${gamesPlayed}/${totalGames}</td>
+      <td>${gamesPlayed}/${totalGames}${twitchInfo}</td>
       <td class="${statusClass}">${status}</td>
       <td>
         <a href="/godgamer-display?id=${session.id}">Settings</a>

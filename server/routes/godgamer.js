@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { load, save } = require('../store');
+const twitch = require('../twitch');
 
 function getNextIterationName(baseName, existingNames) {
   const base = baseName.replace(/\s*\(\d+\)$/, '').replace(/\s+\d+$/, '').trim();
@@ -23,6 +24,97 @@ function getBoxartUrl(image) {
   if (image.filename) return `https://cdn.thegamesdb.net/images/medium/${image.filename}`;
   return null;
 }
+
+// Resolve a Twitch category for a game name (uses the game's own stored category first, then local DB cache, then live search)
+async function resolveTwitchCategory(gameName, cacheGame) {
+  if (cacheGame && cacheGame.twitchCategoryId) {
+    return { id: cacheGame.twitchCategoryId, name: cacheGame.twitchCategoryName || gameName, fromCache: true };
+  }
+  const games = load('godgamer-games');
+  const cached = games.find(g => g.name && g.name.toLowerCase() === gameName.toLowerCase() && g.twitchCategoryId);
+  if (cached) {
+    return { id: cached.twitchCategoryId, name: cached.twitchCategoryName, fromCache: true };
+  }
+  const category = await twitch.resolveCategory(gameName);
+  return { id: category.id, name: category.name, fromCache: false };
+}
+
+// Resolve + apply a Twitch category for a game name, caching the match in the local game DB
+async function applyTwitchCategory(gameName, cacheGame) {
+  const resolved = await resolveTwitchCategory(gameName, cacheGame);
+  const applied = await twitch.setChannelCategory(resolved.id);
+
+  const games = load('godgamer-games');
+  const target = (cacheGame && cacheGame.tgdbId && games.find(g => g.tgdbId === cacheGame.tgdbId))
+    || games.find(g => g.name && g.name.toLowerCase() === gameName.toLowerCase());
+  if (target) {
+    target.twitchCategoryId = resolved.id;
+    target.twitchCategoryName = resolved.name;
+    save('godgamer-games', games);
+  }
+
+  return {
+    categoryId: resolved.id,
+    categoryName: resolved.name,
+    fromCache: resolved.fromCache,
+    broadcasterId: applied.broadcasterId
+  };
+}
+
+// Twitch category sync status
+router.get('/twitch/status', async (req, res) => {
+  const configured = twitch.isConfigured();
+  let broadcaster = null;
+  let error = null;
+  if (configured) {
+    try {
+      const b = await twitch.getBroadcaster();
+      broadcaster = { id: b.id, login: b.login, displayName: b.display_name || b.login };
+    } catch (e) {
+      error = e.message;
+    }
+  }
+  res.json({ configured, broadcaster, error });
+});
+
+// Search Twitch categories (manual override)
+router.post('/twitch/search', async (req, res) => {
+  try {
+    const { q } = req.body;
+    if (!q) return res.status(400).json({ error: 'Query required' });
+    const results = await twitch.searchCategories(q);
+    res.json(results.map(c => ({
+      id: c.id,
+      name: c.name,
+      boxartUrl: (c.box_art_url || '').replace('{width}x{height}', '60x80') || null
+    })));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Apply Twitch category for a game name or a session's current game
+router.post('/twitch/apply', async (req, res) => {
+  try {
+    let gameName = req.body.name;
+  if (!gameName && req.body.id) {
+    const sessions = load('godgamer-sessions');
+    const session = sessions.find(s => s.id === req.body.id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    const game = session.games[session.currentGameIndex];
+    if (!game || !game.name) return res.status(400).json({ error: 'No current game' });
+    gameName = game.displayName || game.name;
+    const result = await applyTwitchCategory(gameName, game);
+    return res.json(result);
+  }
+  if (!gameName) return res.status(400).json({ error: 'Game name required' });
+
+  const result = await applyTwitchCategory(gameName);
+  res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // Search games via TGDB
 router.get('/search', async (req, res) => {
@@ -187,6 +279,7 @@ router.post('/sessions', (req, res) => {
     startedAt: null,
     endedAt: null,
     createdAt: Date.now(),
+    twitchSync: req.body.twitchSync !== false,
 
     // Overlay settings
     name: req.body.name || 'God Gamer Session',
@@ -293,22 +386,30 @@ router.post('/sessions/:id/games', (req, res) => {
   const session = sessions.find(s => s.id === req.params.id);
   if (!session) return res.status(404).json({ error: 'Session not found' });
 
-  const { tgdbId, name, platform, steamId, boxartUrl } = req.body;
+  const { tgdbId, name, platform, steamId, boxartUrl, twitchCategoryId, twitchCategoryName } = req.body;
 
   // Save/update game in database
-  const existingGame = games.find(g => g.tgdbId === tgdbId || (steamId && g.steamId === steamId));
+  const existingGame = games.find(g =>
+    (tgdbId && g.tgdbId === tgdbId) ||
+    (steamId && g.steamId === steamId) ||
+    (twitchCategoryId && String(g.twitchCategoryId) === String(twitchCategoryId))
+  );
   if (existingGame) {
     if (steamId && !existingGame.steamId) existingGame.steamId = steamId;
     if (boxartUrl && !existingGame.boxartUrl) existingGame.boxartUrl = boxartUrl;
+    if (twitchCategoryId && !existingGame.twitchCategoryId) existingGame.twitchCategoryId = twitchCategoryId;
+    if (twitchCategoryName && !existingGame.twitchCategoryName) existingGame.twitchCategoryName = twitchCategoryName;
     save('godgamer-games', games);
   } else {
     const newGame = {
       id: uuidv4(),
-      tgdbId,
+      tgdbId: tgdbId || null,
       steamId: steamId || null,
       name,
-      platform,
+      platform: platform || 'Unknown',
       boxartUrl: boxartUrl || null,
+      twitchCategoryId: twitchCategoryId || null,
+      twitchCategoryName: twitchCategoryName || null,
       playCount: 0,
       createdAt: Date.now()
     };
@@ -318,11 +419,14 @@ router.post('/sessions/:id/games', (req, res) => {
 
   const gameEntry = {
     id: uuidv4(),
-    tgdbId,
+    tgdbId: tgdbId || null,
     name,
-    platform,
+    displayName: null,
+    platform: platform || 'Unknown',
     steamId: steamId || null,
     boxartUrl: boxartUrl || null,
+    twitchCategoryId: twitchCategoryId || null,
+    twitchCategoryName: twitchCategoryName || null,
     result: null,
     startedAt: null,
     endedAt: null,
@@ -330,6 +434,39 @@ router.post('/sessions/:id/games', (req, res) => {
   };
 
   session.games.push(gameEntry);
+  save('godgamer-sessions', sessions);
+  res.json(session);
+});
+
+// Reorder games in a session (started games stay locked in place)
+// NOTE: must be declared before '/sessions/:id/games/:gameId' so 'order' isn't captured as a gameId
+router.put('/sessions/:id/games/order', (req, res) => {
+  const sessions = load('godgamer-sessions');
+  const session = sessions.find(s => s.id === req.params.id);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+
+  const order = req.body.order;
+  if (!Array.isArray(order) || order.length !== session.games.length) {
+    return res.status(400).json({ error: 'Order must list every game ID' });
+  }
+
+  const ids = session.games.map(g => g.id);
+  const locked = session.games.filter(g => g.startedAt).length;
+
+  for (let i = 0; i < locked; i++) {
+    if (order[i] !== ids[i]) {
+      return res.status(400).json({ error: 'Started games cannot be reordered' });
+    }
+  }
+
+  const sortedOrder = [...order].sort().join('|');
+  const sortedIds = [...ids].sort().join('|');
+  if (sortedOrder !== sortedIds) {
+    return res.status(400).json({ error: 'Invalid order (duplicate or unknown game ID)' });
+  }
+
+  const byId = new Map(session.games.map(g => [g.id, g]));
+  session.games = order.map(id => byId.get(id));
   save('godgamer-sessions', sessions);
   res.json(session);
 });
@@ -348,8 +485,24 @@ router.delete('/sessions/:id/games/:gameId', (req, res) => {
   res.json(session);
 });
 
+// Update a game in session (display name override)
+router.put('/sessions/:id/games/:gameId', (req, res) => {
+  const sessions = load('godgamer-sessions');
+  const session = sessions.find(s => s.id === req.params.id);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+
+  const game = session.games.find(g => g.id === req.params.gameId);
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+
+  if (typeof req.body.displayName === 'string') {
+    game.displayName = req.body.displayName.trim() || null;
+  }
+  save('godgamer-sessions', sessions);
+  res.json(session);
+});
+
 // Start current game
-router.post('/sessions/:id/games/current/start', (req, res) => {
+router.post('/sessions/:id/games/current/start', async (req, res) => {
   const sessions = load('godgamer-sessions');
   const session = sessions.find(s => s.id === req.params.id);
   if (!session) return res.status(404).json({ error: 'Session not found' });
@@ -358,12 +511,28 @@ router.post('/sessions/:id/games/current/start', (req, res) => {
   if (!game) return res.status(400).json({ error: 'No current game' });
 
   game.startedAt = Date.now();
+
+  if (session.twitchSync !== false && twitch.isConfigured() && game.name) {
+    const effectiveName = game.displayName || game.name;
+    game.twitchSyncStatus = 'pending';
+    try {
+      const applied = await applyTwitchCategory(effectiveName, game);
+      game.twitchCategoryId = applied.categoryId;
+      game.twitchCategoryName = applied.categoryName;
+      game.twitchSyncStatus = 'ok';
+      game.twitchSyncError = null;
+    } catch (e) {
+      game.twitchSyncStatus = 'error';
+      game.twitchSyncError = e.message;
+    }
+  }
+
   save('godgamer-sessions', sessions);
   res.json(session);
 });
 
 // End current game (win/loss)
-router.post('/sessions/:id/games/current/end', (req, res) => {
+router.post('/sessions/:id/games/current/end', async (req, res) => {
   const sessions = load('godgamer-sessions');
   const games = load('godgamer-games');
   const session = sessions.find(s => s.id === req.params.id);
@@ -390,9 +559,24 @@ router.post('/sessions/:id/games/current/end', (req, res) => {
     save('godgamer-games', games);
   }
 
-  // Move to next game if not at cap
+  // Move to next game if not at cap, and pre-apply its Twitch category
   if (session.currentGameIndex < session.games.length - 1 && session.currentGameIndex < session.cap - 1) {
     session.currentGameIndex++;
+    const nextGame = session.games[session.currentGameIndex];
+    if (session.twitchSync !== false && twitch.isConfigured() && nextGame && nextGame.name) {
+      const effectiveName = nextGame.displayName || nextGame.name;
+      nextGame.twitchSyncStatus = 'pending';
+      try {
+        const applied = await applyTwitchCategory(effectiveName, nextGame);
+        nextGame.twitchCategoryId = applied.categoryId;
+        nextGame.twitchCategoryName = applied.categoryName;
+        nextGame.twitchSyncStatus = 'ok';
+        nextGame.twitchSyncError = null;
+      } catch (e) {
+        nextGame.twitchSyncStatus = 'error';
+        nextGame.twitchSyncError = e.message;
+      }
+    }
   }
 
   save('godgamer-sessions', sessions);

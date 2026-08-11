@@ -144,7 +144,10 @@ All modules share these features:
 
 ### Features
 - Track gaming challenge sessions with game cap
-- Dual search: "Search Local" (fast, no API) and "Search TGDB" (full API)
+- Dual search: "Search Local" (fast, no API), "Search TGDB" (full API), and "Search Twitch" (Helix category DB — great for indie/esports titles TGDB lacks; also pre-wires Twitch category sync so Start Game needs no live search)
+- Display-name override per game (e.g. add "League of Legends", display/sync as "Teamfight Tactics")
+- Drag-and-drop reordering of upcoming games (started games lock in place); shows on overlay immediately
+- Auto Twitch category sync on Start Game **and** on Win/Loss (flips to the next game's category)
 - Manual game entry via JSON textarea for uncatalogued games
 - Local game database for quick search (saves API calls)
 - Boxart/title screen images from TGDB

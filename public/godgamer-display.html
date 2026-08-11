@@ -58,6 +58,12 @@
     .game-item .game-result { 
       padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;
     }
+    .game-item[draggable="true"] { cursor: grab; }
+    .game-item[draggable="true"]:active { cursor: grabbing; }
+    .game-item .drag-handle { color: #666; cursor: grab; user-select: none; }
+    .game-item.dragging { opacity: 0.4; }
+    .game-item.drag-over { outline: 2px solid #4da6ff; outline-offset: -2px; }
+    .game-item.drop-end { justify-content: center; color: #888; font-size: 13px; cursor: pointer; border: 1px dashed #555; }
     .game-item .game-result.win { background: #1a3a1a; color: #4dff4d; }
     .game-item .game-result.loss { background: #3a1a1a; color: #ff4d4d; }
     .game-item .game-result.current { background: #1a1a3a; color: #4da6ff; }
@@ -131,6 +137,8 @@
         <button class="btn btn-success" id="startGameBtn" onclick="startCurrentGame()">Start Game</button>
         <button class="btn btn-stop" id="endGameWinBtn" onclick="endCurrentGame('win')">Win</button>
         <button class="btn btn-stop" id="endGameLossBtn" onclick="endCurrentGame('loss')">Loss</button>
+        <button class="btn btn-secondary" id="twitchApplyBtn" onclick="applyTwitch()">Apply Twitch Category</button>
+        <span id="twitchStatus" style="color: #aaa; font-size: 13px;"></span>
       </div>
     </div>
   </div>
@@ -141,6 +149,7 @@
       <input type="text" id="gameSearch" placeholder="Search for a game..." style="flex: 1; margin-bottom: 0;">
       <button class="btn" onclick="searchLocal()" id="localSearchBtn">Search Local</button>
       <button class="btn" onclick="searchTGDB()" id="tgdbSearchBtn">Search TGDB</button>
+      <button class="btn" onclick="searchTwitch()" id="twitchSearchBtn">Search Twitch</button>
     </div>
     <div class="search-results" id="searchResults"></div>
     <div id="selectedGame" style="display: none; margin-top: 10px;">
@@ -222,6 +231,11 @@
     </div>
     <div class="row">
       <div>
+        <label><input type="checkbox" id="twitchSync" checked> Auto-set Twitch category on Start Game</label>
+      </div>
+    </div>
+    <div class="row">
+      <div>
         <label><input type="checkbox" id="outlineEnabled"> Enable Text Outline</label>
       </div>
     </div>
@@ -300,6 +314,7 @@
         document.getElementById('posX').value = session.position?.x || 100;
         document.getElementById('posY').value = session.position?.y || 100;
         document.getElementById('iconSize').value = session.iconSize || 32;
+        document.getElementById('twitchSync').checked = session.twitchSync !== false;
         document.getElementById('outlineEnabled').checked = session.outlineEnabled || false;
         document.getElementById('outlineColor').value = session.outlineColor || '#000000';
         document.getElementById('outlineWidth').value = session.outlineWidth || 2;
@@ -307,6 +322,7 @@
         
         document.getElementById('outlineSettings').style.display = session.outlineEnabled ? 'block' : 'none';
         
+        updateTwitchStatus();
         updateStatus();
         renderGameList();
         updatePreview();
@@ -369,6 +385,71 @@
       }
     }
 
+    function updateTwitchStatus() {
+      const el = document.getElementById('twitchStatus');
+      const btn = document.getElementById('twitchApplyBtn');
+      if (!session || !session.games || session.games.length === 0) {
+        el.textContent = '';
+        return;
+      }
+      const game = session.games[session.currentGameIndex];
+      if (!game) {
+        el.textContent = '';
+        return;
+      }
+      btn.disabled = false;
+      if (game.twitchSyncError) {
+        el.textContent = 'Twitch: error (' + game.twitchSyncError + ')';
+        el.style.color = '#ff994d';
+      } else if (game.twitchCategoryName) {
+        el.textContent = 'Twitch: ' + game.twitchCategoryName;
+        el.style.color = '#4dff4d';
+      } else {
+        el.textContent = '';
+        el.style.color = '#aaa';
+      }
+    }
+
+    async function applyTwitch() {
+      if (!session) return;
+      const game = session.games[session.currentGameIndex];
+      if (!game) return;
+
+      const btn = document.getElementById('twitchApplyBtn');
+      const statusEl = document.getElementById('twitchStatus');
+      btn.disabled = true;
+      btn.textContent = 'Applying...';
+      statusEl.textContent = 'Applying Twitch category...';
+      statusEl.style.color = '#aaa';
+
+      try {
+        const res = await fetch('/api/godgamer/twitch/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: game.name })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          statusEl.textContent = 'Twitch: error (' + (data.error || 'unknown') + ')';
+          statusEl.style.color = '#ff994d';
+        } else {
+          game.twitchCategoryId = data.categoryId;
+          game.twitchCategoryName = data.categoryName;
+          game.twitchSyncStatus = 'ok';
+          game.twitchSyncError = null;
+          statusEl.textContent = 'Twitch: ' + data.categoryName + (data.fromCache ? ' (cached)' : '');
+          statusEl.style.color = '#4dff4d';
+          renderGameList();
+        }
+      } catch (e) {
+        statusEl.textContent = 'Twitch: error applying category';
+        statusEl.style.color = '#ff994d';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Apply Twitch Category';
+      }
+    }
+
     async function nextGame() {
       if (!session || session.currentGameIndex >= session.games.length - 1) return;
       session.currentGameIndex++;
@@ -379,6 +460,7 @@
       });
       renderGameList();
       updateStatus();
+      updateTwitchStatus();
     }
 
     async function prevGame() {
@@ -391,6 +473,7 @@
       });
       renderGameList();
       updateStatus();
+      updateTwitchStatus();
     }
 
     function updateStatus() {
@@ -403,6 +486,7 @@
       const startGameBtn = document.getElementById('startGameBtn');
       const endGameWinBtn = document.getElementById('endGameWinBtn');
       const endGameLossBtn = document.getElementById('endGameLossBtn');
+      const twitchApplyBtn = document.getElementById('twitchApplyBtn');
       
       if (session.isFinished) {
         statusEl.className = 'status status-completed';
@@ -415,6 +499,7 @@
         startGameBtn.disabled = true;
         endGameWinBtn.disabled = true;
         endGameLossBtn.disabled = true;
+        twitchApplyBtn.disabled = true;
       } else if (session.isActive) {
         statusEl.className = 'status status-active';
         statusEl.textContent = 'Session Active - Playing game ' + (session.currentGameIndex + 1) + ' of ' + session.games.length;
@@ -426,6 +511,7 @@
         startGameBtn.disabled = false;
         endGameWinBtn.disabled = false;
         endGameLossBtn.disabled = false;
+        twitchApplyBtn.disabled = !session.games || session.games.length === 0;
       } else if (session.endedAt) {
         statusEl.className = 'status status-completed';
         statusEl.textContent = 'Session Completed';
@@ -437,6 +523,7 @@
         startGameBtn.disabled = true;
         endGameWinBtn.disabled = true;
         endGameLossBtn.disabled = true;
+        twitchApplyBtn.disabled = true;
       } else {
         statusEl.className = 'status status-inactive';
         statusEl.textContent = 'Session Inactive - Press Start to begin';
@@ -448,6 +535,7 @@
         startGameBtn.disabled = true;
         endGameWinBtn.disabled = true;
         endGameLossBtn.disabled = true;
+        twitchApplyBtn.disabled = true;
       }
     }
 
@@ -525,6 +613,50 @@
       }
     }
 
+    async function searchTwitch() {
+      const query = document.getElementById('gameSearch').value.trim();
+      if (query.length < 2) {
+        alert('Type at least 2 characters to search');
+        return;
+      }
+
+      const btn = document.getElementById('twitchSearchBtn');
+      btn.disabled = true;
+      btn.textContent = 'Searching...';
+
+      try {
+        const res = await fetch('/api/godgamer/twitch/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ q: query })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Twitch search failed');
+        const categories = data.results || data;
+
+        const resultsEl = document.getElementById('searchResults');
+        if (!categories || categories.length === 0) {
+          resultsEl.innerHTML = '<div style="padding: 10px; color: #aaa;">No results found on Twitch</div>';
+        } else {
+          resultsEl.innerHTML = categories.map(c => `
+            <div class="search-result-item" onclick='selectGame(${JSON.stringify({ ...c, platform: 'Twitch', twitchCategoryId: c.id, twitchCategoryName: c.name }).replace(/'/g, "&#39;")})'>
+              <img src="${c.boxartUrl || ''}" alt="" onerror="this.style.display='none'" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">
+              <div>
+                <div>${c.name}</div>
+                <div style="color: #aaa; font-size: 12px;">Twitch</div>
+              </div>
+            </div>
+          `).join('');
+        }
+        resultsEl.classList.add('show');
+      } catch (e) {
+        alert('Twitch search failed: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Search Twitch';
+      }
+    }
+
     function selectGame(game) {
       selectedGameData = game;
       document.getElementById('selectedGame').style.display = 'block';
@@ -537,7 +669,11 @@
     }
 
     async function addGameToSession() {
-      if (!session || !selectedGameData) return;
+      if (!selectedGameData) return;
+      if (!session) {
+        await createSession();
+        if (!session) return;
+      }
 
       try {
         const res = await fetch('/api/godgamer/sessions/' + session.id + '/games', {
@@ -548,7 +684,9 @@
             name: selectedGameData.name,
             platform: selectedGameData.platform,
             steamId: selectedGameData.steamId || null,
-            boxartUrl: selectedGameData.boxartUrl || null
+            boxartUrl: selectedGameData.boxartUrl || null,
+            twitchCategoryId: selectedGameData.twitchCategoryId || null,
+            twitchCategoryName: selectedGameData.twitchCategoryName || null
           })
         });
         session = await res.json();
@@ -593,7 +731,9 @@
             name: gameData.name,
             platform: gameData.platform || 'Unknown',
             steamId: gameData.steamId || null,
-            boxartUrl: gameData.boxartUrl || null
+            boxartUrl: gameData.boxartUrl || null,
+            twitchCategoryId: gameData.twitchCategoryId || null,
+            twitchCategoryName: gameData.twitchCategoryName || null
           })
         });
         session = await res.json();
@@ -620,6 +760,28 @@
       }
     }
 
+    async function setGameDisplayName(gameId, value) {
+      if (!session) return;
+      const game = session.games.find(g => g.id === gameId);
+      if (!game) return;
+      const displayName = value.trim() || null;
+      if (displayName === (game.displayName || null)) return;
+
+      game.displayName = displayName;
+      try {
+        const res = await fetch('/api/godgamer/sessions/' + session.id + '/games/' + gameId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ displayName })
+        });
+        if (!res.ok) throw new Error();
+      } catch (e) {
+        alert('Failed to save display name');
+      }
+      renderGameList();
+      updatePreview();
+    }
+
     async function startCurrentGame() {
       if (!session) return;
       try {
@@ -628,6 +790,7 @@
         });
         session = await res.json();
         renderGameList();
+        updateTwitchStatus();
       } catch (e) {
         alert('Failed to start game');
       }
@@ -649,6 +812,7 @@
           await finishSession();
         } else {
           updateStatus();
+          updateTwitchStatus();
         }
         
         renderGameList();
@@ -688,13 +852,22 @@
           resultText = 'PLAYING';
         }
 
+        const locked = !!game.startedAt;
+        const dragAttrs = locked
+          ? ''
+          : `draggable="true" ondragstart="startDrag(event, ${i})" ondragover="dragOver(event, ${i})" ondrop="dropGame(event, ${i})" ondragend="endDrag(event)"`;
+
         return `
-          <li class="game-item">
+          <li class="game-item" ${dragAttrs}>
+            <span class="drag-handle" style="${locked ? 'visibility: hidden;' : ''}">⋮⋮</span>
             <span style="color: #aaa; font-weight: bold; width: 25px;">${i + 1}.</span>
             <img src="${game.boxartUrl || ''}" alt="" onerror="this.style.display='none'">
-            <div class="game-info">
-              <div class="game-name">${game.name}</div>
+            <div class="game-info" style="flex: 1;">
+              <div class="game-name">${game.displayName || game.name}${locked ? ' <span style="color:#666; font-size:11px;">(locked)</span>' : ''}</div>
               <div class="game-platform">${game.platform || ''}</div>
+              <input type="text" class="display-name-input" value="${(game.displayName || '').replace(/"/g, '&quot;')}" placeholder="Override name: ${(game.name || '').replace(/"/g, '&quot;')}" data-game-id="${game.id}" onchange="setGameDisplayName('${game.id}', this.value)" style="margin-top: 4px; margin-bottom: 0; font-size: 12px; padding: 4px 8px;">
+              ${game.twitchCategoryName ? `<div class="game-platform">Twitch: ${game.twitchCategoryName}</div>` : ''}
+              ${game.twitchSyncError ? `<div class="game-platform" style="color: #ff994d;">Twitch error: ${game.twitchSyncError}</div>` : ''}
             </div>
             ${resultText ? `<span class="game-result ${resultClass}">${resultText}</span>` : ''}
             ${game.duration != null ? `<span style="color: #aaa; font-size: 12px;">${formatDuration(game.duration)}</span>` : ''}
@@ -702,6 +875,77 @@
           </li>
         `;
       }).join('');
+
+      listEl.innerHTML += '<li class="game-item drop-end" id="dropEnd" style="display:none;" ondrop="dropGame(event, ' + session.games.length + ')" ondragover="dragOverEnd(event)" onclick="return false;">Drop here to move to last</li>';
+    }
+
+    let dragFrom = null;
+
+    function startDrag(e, i) {
+      const locked = session.games.filter(g => g.startedAt).length;
+      if (i < locked) { e.preventDefault(); return; }
+      dragFrom = i;
+      e.dataTransfer.setData('text/plain', String(i));
+      e.dataTransfer.effectAllowed = 'move';
+      e.currentTarget.classList.add('dragging');
+      const dropEnd = document.getElementById('dropEnd');
+      if (dropEnd) dropEnd.style.display = 'block';
+    }
+
+    function dragOver(e, i) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.game-item').forEach(el => el.classList.remove('drag-over'));
+      const items = document.querySelectorAll('.game-item');
+      if (items[i] && i !== dragFrom) items[i].classList.add('drag-over');
+    }
+
+    function dragOverEnd(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.game-item').forEach(el => el.classList.remove('drag-over'));
+      document.getElementById('dropEnd').style.background = 'rgba(255,255,255,0.1)';
+    }
+
+    function dropGame(e, i) {
+      e.preventDefault();
+      const from = dragFrom;
+      endDrag();
+      if (from === null || from === i) return;
+      const locked = session.games.filter(g => g.startedAt).length;
+      if (i < locked) return;
+
+      const [moved] = session.games.splice(from, 1);
+      session.games.splice(i, 0, moved);
+      renderGameList();
+      updatePreview();
+      saveOrder();
+    }
+
+    function endDrag() {
+      dragFrom = null;
+      document.querySelectorAll('.game-item').forEach(el => {
+        el.classList.remove('dragging');
+        el.classList.remove('drag-over');
+      });
+      const dropEnd = document.getElementById('dropEnd');
+      if (dropEnd) { dropEnd.style.background = ''; dropEnd.style.display = 'none'; }
+    }
+
+    async function saveOrder() {
+      try {
+        const res = await fetch('/api/godgamer/sessions/' + session.id + '/games/order', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order: session.games.map(g => g.id) })
+        });
+        if (!res.ok) throw new Error();
+        session = await res.json();
+        renderGameList();
+        updatePreview();
+      } catch (e) {
+        alert('Failed to save game order');
+      }
     }
 
     function formatDuration(seconds) {
@@ -726,6 +970,7 @@
           y: parseInt(document.getElementById('posY').value) || 100
         },
         iconSize: parseInt(document.getElementById('iconSize').value) || 32,
+        twitchSync: document.getElementById('twitchSync').checked,
         outlineEnabled: document.getElementById('outlineEnabled').checked,
         outlineColor: document.getElementById('outlineColor').value,
         outlineWidth: parseInt(document.getElementById('outlineWidth').value) || 2,
@@ -783,7 +1028,7 @@
       if (session.games && session.games.length > 0) {
         const gamesHtml = session.games.slice(0, 5).map((g, i) => {
           const result = g.result ? ` [${g.result.toUpperCase()}]` : (i === session.currentGameIndex && session.isActive ? ' [PLAYING]' : '');
-          return `<div>${i + 1}. ${g.name}${result}</div>`;
+          return `<div>${i + 1}. ${g.displayName || g.name}${result}</div>`;
         }).join('');
         previewText.innerHTML = gamesHtml;
       } else {
