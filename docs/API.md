@@ -820,6 +820,160 @@ Returns rendered HTML of active overlays only.
 
 ---
 
+## Archipelago Tracker API
+
+All endpoints are prefixed with `/api/archipelago`.
+
+### Create Overlay
+
+```http
+POST /api/archipelago/overlays
+```
+
+**Body:** `{ "name": "Archipelago Tracker", "webhost": "http://127.0.0.1:38080", "roomId": "MyRoom" }`
+
+All overlay settings are optional (see MODULES.md for defaults). **Response:** the overlay object.
+
+---
+
+### Get All Overlays
+
+```http
+GET /api/archipelago/overlays
+```
+
+Returns an array of overlays.
+
+---
+
+### Get Overlay
+
+```http
+GET /api/archipelago/overlays/:id
+```
+
+Returns a single overlay, or 404.
+
+---
+
+### Update Overlay
+
+```http
+PUT /api/archipelago/overlays/:id
+```
+
+**Body:** any subset of overlay fields. If the tracker is running and the source signature changed (WebHost URL, Room ID, password, reconnect delay, or the set of visible slots), the runner restarts automatically (`restarted: true` in the response). A `currentSlot` or `twitchSync` change while active also triggers Twitch auto-set (`twitchResult` in the response).
+
+---
+
+### Delete Overlay
+
+```http
+DELETE /api/archipelago/overlays/:id
+```
+
+Stops the runner and removes the overlay. **Response:** `{ "success": true }`
+
+---
+
+### Start Overlay
+
+```http
+POST /api/archipelago/overlays/:id/start
+```
+
+Marks the overlay active, opens one tracker connection per visible slot, and applies the Twitch category if `twitchSync` is on. Throws (500) if no room is loaded or no slots are visible. **Response:** overlay + `status` snapshot + `twitchResult`.
+
+---
+
+### Stop Overlay
+
+```http
+POST /api/archipelago/overlays/:id/stop
+```
+
+Disconnects all tracker connections and clears runtime state. **Response:** the overlay (`isActive: false`).
+
+---
+
+### Duplicate Overlay
+
+```http
+POST /api/archipelago/overlays/:id/duplicate
+```
+
+**Response:** a new inactive overlay with an auto-incremented name.
+
+---
+
+### Load Room
+
+```http
+POST /api/archipelago/overlays/:id/room/load
+```
+
+**Body:** `{ "webhost": "...", "roomId": "...", "password": "..." }`
+
+Wakes the room (`GET /room/<id>`), fetches `GET /api/room_status/<id>`, and replaces the slot list (preserving display-name/visibility/Twitch overrides for slots that still exist). Restarts the runner if it was running. **Response:** `{ overlay, players: [{slot, name, game}], lastPort }`.
+
+---
+
+### Get Status
+
+```http
+GET /api/archipelago/overlays/:id/status
+```
+
+**Response:**
+```json
+{
+  "running": true,
+  "lastError": null,
+  "port": 38212,
+  "connectedCount": 4,
+  "rowCount": 4,
+  "rows": [
+    { "slot": 1, "name": "KhTest", "game": "Tunic", "current": true,
+      "checked": 12, "total": 40, "pct": 30, "status": "connected", "online": true, "playerOnline": true }
+  ],
+  "header": { "checked": 45, "total": 160, "pct": 28.1 }
+}
+```
+
+`checked`/`total`/`pct` are `null` until the slot's baseline is known (`'--'` on the overlay). `status` is the tracker-link state for that slot: `connected`, `disconnected`, `goal`, or `unknown`. `playerOnline` is `true`/`false`/`null` and reflects whether the slot's *game* client is in the room (independent of our tracker connection).
+
+---
+
+### Twitch Category Search
+
+```http
+POST /api/archipelago/twitch/search
+```
+
+**Body:** `{ "q": "tunic" }` → `[{ id, name, boxartUrl }]`
+
+---
+
+### Twitch Category Apply
+
+```http
+POST /api/archipelago/twitch/apply
+```
+
+**Body:** `{ "overlayId": "...", "slot": 1 }` (resolves the slot's game, stores the assignment, applies it) or `{ "name": "Game Name" }`. **Response:** `{ categoryId, categoryName, broadcasterId? }` (`skipped: true` when Twitch is not configured).
+
+---
+
+### Twitch Status
+
+```http
+GET /api/archipelago/twitch/status
+```
+
+**Response:** `{ configured, broadcaster, error }`
+
+---
+
 ## Console Endpoints
 
 ### Console Page
@@ -838,7 +992,7 @@ Returns console HTML page for managing overlays.
 GET /console/render
 ```
 
-Returns JSON with `textRows`, `scrollRows`, and `godgamerSessions` for auto-refresh.
+Returns JSON with `textRows`, `scrollRows`, `godgamerRows`, `canvasRows`, and `archipelagoRows` for auto-refresh.
 
 ---
 

@@ -351,6 +351,163 @@ All modules share these features:
 
 ---
 
+## Archipelago Tracker
+
+**Status:** Complete  
+**Settings:** `/archipelago-display`  
+**API:** `/api/archipelago/*`  
+**Complexity:** Medium-High
+
+### Features
+- Live per-slot progress overlay for [Archipelago](https://archipelago.gg) multiworld rooms (row layout: slot name big, game as smaller second line, right-aligned checks + percent, status dot)
+- Connects **directly to the Archipelago server** via the AP protocol using `archipelago.js` — one persistent tracker connection per visible slot (tags `["DevStream","Tracker"]`, `items: 0`, no `slotData`, never sends game actions)
+- Room loaded via WebHost REST: `GET /room/<id>` (wakes a paused room) + `GET /api/room_status/<id>` (players + `last_port`); re-fetch on every reconnect since the port changes when a room restarts
+- Baseline totals per slot come from the Connected packet (`checked` + `missing`); live increments come from the room's `locationsChecked` (authoritative) with an ItemSend guard for slots whose baseline is not known yet
+- Two independent per-slot indicators:
+  - **Status dot** = this tracker's own link to the room: connected (green) when our socket is authenticated, disconnected (red) while reconnecting, goal (gold) when the slot has reached its goal (from the `Goal` message or the authoritative `_read_client_status_<team>_<slot>` stored key), unknown (gray) when not running
+  - **Player-online diamond** (left of the name) = whether the slot's *game* client is in the room: online (green) / offline (red) / unknown (gray). Derived from `Join`/`Part` broadcasts, ignoring tracker clients (`Join` filtered by tags, `Part` filtered by its "stopped tracking/viewing/hinting" text), since the server broadcasts these for every connection including our own tracker
+- Per-slot visibility checkboxes, display-name override, game override, and current-slot radio (highlight + Twitch target)
+- Twitch category integration: per-slot category assignment with Twitch search, manual "Apply", and optional auto-set when the current slot changes while running (cached in `data/archipelago-games.json`)
+- Automatic reconnect with exponential backoff (base `reconnectDelay`, x2, cap 60s) + 60s watchdog that drops hidden slots and re-connects missing ones; seed-name comparison resets counts when the room changes
+- Loopback URL rewriting: `127.0.0.1`/`localhost` in the WebHost URL becomes `host.docker.internal` inside the container (override with `AP_HOST_ALIAS`)
+- Row content toggles (header, slot number, game line, checks, percent, status dot, highlight current), live preview polling every 2s, active overlays auto-restart on server boot
+- Standard overlay features: start/stop, duplicate, delete, styling, custom CSS
+
+### Settings
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| name | string | "Archipelago Tracker" | Overlay display name (also shown in header) |
+| webhost | string | "http://127.0.0.1:38080" | Archipelago WebHost base URL |
+| roomId | string | "" | Room ID to track |
+| password | string | "" | Room password (if any) |
+| reconnectDelay | number | 5 | Reconnect backoff base in seconds |
+| currentSlot | number | null | Slot marked as "current" (highlight + Twitch target) |
+| showHeader | boolean | true | Show header row with totals |
+| showNumber | boolean | true | Show slot number prefix |
+| showGame | boolean | true | Show game name under the slot name |
+| showChecks | boolean | true | Show `checked/total` |
+| showPercent | boolean | true | Show completion percent |
+| showStatus | boolean | true | Show status dot (tracker link + goal) |
+| showPlayer | boolean | true | Show player-online indicator (diamond) |
+| highlightCurrent | boolean | true | Highlight the current slot row |
+| twitchSync | boolean | true | Auto-set Twitch category on current-slot change (while active) |
+| fontSize | number | 28 | Font size in pixels |
+| fontColor | string | "#ffffff" | Text color |
+| font | string | "Arial" | Font family |
+| backgroundColor | string | "transparent" | Background color |
+| position | object | {x: 100, y: 100} | X/Y coordinates |
+| opacity | number | 1 | Opacity (0-1) |
+| outlineEnabled | boolean | false | Enable text outline |
+| outlineColor | string | "#000000" | Outline color |
+| outlineWidth | number | 2 | Outline width in pixels |
+| rowGap | number | 8 | Gap between rows in pixels |
+| customCSS | string | "" | Custom CSS injection |
+
+### Data Models
+
+**Overlay:**
+```json
+{
+  "id": "uuid",
+  "name": "Archipelago Tracker",
+  "isActive": false,
+  "webhost": "http://127.0.0.1:38080",
+  "roomId": "MyRoom",
+  "password": "",
+  "reconnectDelay": 5,
+  "currentSlot": 1,
+  "slots": [
+    {
+      "slot": 1,
+      "name": "KhTest",
+      "displayName": null,
+      "game": "Tunic",
+      "visible": true,
+      "twitchCategoryId": null,
+      "twitchCategoryName": null
+    }
+  ],
+  "showHeader": true,
+  "showNumber": true,
+  "showGame": true,
+  "showChecks": true,
+  "showPercent": true,
+  "showStatus": true,
+  "showPlayer": true,
+  "highlightCurrent": true,
+  "twitchSync": true,
+  "fontSize": 28,
+  "fontColor": "#ffffff",
+  "font": "Arial",
+  "backgroundColor": "transparent",
+  "position": {"x": 100, "y": 100},
+  "opacity": 1,
+  "outlineEnabled": false,
+  "outlineColor": "#000000",
+  "outlineWidth": 2,
+  "rowGap": 8,
+  "customCSS": "",
+  "createdAt": 0
+}
+```
+
+**Runtime status (`GET /overlays/:id/status`):**
+```json
+{
+  "running": true,
+  "lastError": null,
+  "port": 38212,
+  "connectedCount": 4,
+  "rowCount": 4,
+  "rows": [
+    {
+      "slot": 1,
+      "name": "KhTest",
+      "game": "Tunic",
+      "current": true,
+      "checked": 12,
+      "total": 40,
+      "pct": 30,
+      "status": "connected",
+      "online": true,
+      "playerOnline": true
+    }
+  ],
+  "header": {"checked": 45, "total": 160, "pct": 28.1}
+}
+```
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/archipelago/overlays | List all overlays |
+| POST | /api/archipelago/overlays | Create overlay |
+| GET | /api/archipelago/overlays/:id | Get single overlay |
+| PUT | /api/archipelago/overlays/:id | Update overlay (restarts runner if source/slot set changed while running) |
+| DELETE | /api/archipelago/overlays/:id | Delete overlay (stops runner) |
+| POST | /api/archipelago/overlays/:id/start | Start tracker connections + Twitch auto-set |
+| POST | /api/archipelago/overlays/:id/stop | Stop tracker connections |
+| POST | /api/archipelago/overlays/:id/duplicate | Duplicate overlay (numbered name) |
+| GET | /api/archipelago/overlays/:id/status | Live runtime snapshot |
+| POST | /api/archipelago/overlays/:id/room/load | Fetch room status, merge slots, save source |
+| POST | /api/archipelago/twitch/search | Search Twitch categories |
+| POST | /api/archipelago/twitch/apply | Resolve + apply category (overlay slot or name) |
+| GET | /api/archipelago/twitch/status | Twitch configuration status |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| AP_HOST_ALIAS | Hostname used to replace loopback WebHost URLs inside the container (default host.docker.internal) |
+
+### Notes
+- Tracker connections appear in the WebHost player list as connected (same as PopTracker) — harmless, but the slots are real player names, so the server must allow reconnects
+- Counts only advance when the overlay is running; they reset if the room's seed changes
+
+---
+
 ## Adding a New Module
 
 1. Create route file: `server/routes/{module-name}.js`

@@ -8,6 +8,8 @@ const scrollRoutes = require('./routes/scroll');
 const godgamerRoutes = require('./routes/godgamer');
 const canvasRoutes = require('./routes/canvas');
 const debugRoutes = require('./routes/debug');
+const archipelagoRoutes = require('./routes/archipelago');
+const tracker = require('./tracker');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +23,7 @@ app.use('/api', apiRoutes);
 app.use('/api/scroll', scrollRoutes);
 app.use('/api/godgamer', godgamerRoutes);
 app.use('/api/canvas', canvasRoutes);
+app.use('/api/archipelago', archipelagoRoutes);
 app.use('/', debugRoutes);
 
 app.get('/text-display', (req, res) => {
@@ -39,6 +42,11 @@ app.get('/canvas-display', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'canvas-display.html'));
 });
 
+app.get('/archipelago-display', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'archipelago-display.html'));
+});
+
 app.listen(PORT, () => {
   console.log(`DevStream running on http://localhost:${PORT}`);
+  tracker.autoStart();
 });
