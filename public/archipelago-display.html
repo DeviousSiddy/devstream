@@ -224,6 +224,7 @@
       <label><input type="checkbox" id="showPercent" checked> Show percent</label>
       <label><input type="checkbox" id="showStatus" checked> Show status dot</label>
       <label><input type="checkbox" id="showPlayer" checked> Show player-online indicator</label>
+      <label><input type="checkbox" id="showItemFeed" checked> Show item feed (scrolling last 5 pops)</label>
       <label><input type="checkbox" id="highlightCurrent" checked> Highlight current slot</label>
     </div>
     <div class="row" style="margin-top: 12px;">
@@ -401,6 +402,7 @@
       document.getElementById('showPercent').checked = overlay.showPercent !== false;
       document.getElementById('showStatus').checked = overlay.showStatus !== false;
       document.getElementById('showPlayer').checked = overlay.showPlayer !== false;
+      document.getElementById('showItemFeed').checked = overlay.showItemFeed !== false;
       document.getElementById('highlightCurrent').checked = overlay.highlightCurrent !== false;
       document.getElementById('rowGap').value = overlay.rowGap ?? 8;
 
@@ -686,6 +688,7 @@
         showPercent: document.getElementById('showPercent').checked,
         showStatus: document.getElementById('showStatus').checked,
         showPlayer: document.getElementById('showPlayer').checked,
+        showItemFeed: document.getElementById('showItemFeed').checked,
         highlightCurrent: document.getElementById('highlightCurrent').checked,
         rowGap: parseInt(document.getElementById('rowGap').value) || 0,
         twitchSync: document.getElementById('twitchSync').checked,
@@ -803,6 +806,7 @@
       const showPercent = document.getElementById('showPercent').checked;
       const showStatus = document.getElementById('showStatus').checked;
       const showPlayer = document.getElementById('showPlayer').checked;
+      const showItemFeed = document.getElementById('showItemFeed').checked;
       const highlightCurrent = document.getElementById('highlightCurrent').checked;
 
       let rows = [];
@@ -857,12 +861,18 @@
         ? `<div class="arch-header">${esc(overlay ? overlay.name : 'Archipelago Tracker')}<span class="arch-header-stats">${header.checked}/${header.total != null ? header.total : '?'}${header.pct != null ? ' (' + header.pct + '%)' : ''}</span></div>`
         : '';
 
+      const sampleFeed = 'Siddy ➜ Niiko: Master Sword &#8226; Niiko ➜ Siddy: Triforce Piece &#8226; GSJoker ➜ DreamerA: Blue-Eyes White Dragon';
+      const feedHtml = showItemFeed
+        ? `<div style="overflow: hidden; white-space: nowrap; height: 1.4em; line-height: 1.4em; margin-top: 6px; font-size: 0.62em; opacity: 0.85;">${sampleFeed}</div>`
+        : '';
+
       preview.innerHTML = `
         <div class="arch-overlay" style="background-color: ${bgColor}; opacity: ${opacity}; row-gap: ${rowGap}px; font-size: ${fontSize}px; color: ${fontColor}; font-family: ${font}; ${collectOutline()} --arch-game-size: ${gameSize}px;">
           ${headerHtml}
           <div class="arch-rows">
             ${rowsHtml || '<div style="color: #666;">No slots</div>'}
           </div>
+          ${feedHtml}
         </div>
       `;
     }
@@ -877,7 +887,7 @@
       if (e.key === 'Enter') searchTwitch();
     });
 
-    ['fontSize', 'fontColor', 'font', 'backgroundColor', 'opacity', 'bgTransparent', 'outlineEnabled', 'outlineColor', 'outlineWidth', 'rowGap', 'showHeader', 'showNumber', 'showGame', 'showChecks', 'showPercent', 'showStatus', 'showPlayer', 'highlightCurrent'].forEach(id => {
+    ['fontSize', 'fontColor', 'font', 'backgroundColor', 'opacity', 'bgTransparent', 'outlineEnabled', 'outlineColor', 'outlineWidth', 'rowGap', 'showHeader', 'showNumber', 'showGame', 'showChecks', 'showPercent', 'showStatus', 'showPlayer', 'showItemFeed', 'highlightCurrent'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('input', renderPreview);
       if (el) el.addEventListener('change', renderPreview);

@@ -46,6 +46,7 @@ function defaultOverlay(body) {
     showPercent: body.showPercent !== false,
     showStatus: body.showStatus !== false,
     showPlayer: body.showPlayer !== false,
+    showItemFeed: body.showItemFeed !== false,
     highlightCurrent: body.highlightCurrent !== false,
 
     twitchSync: body.twitchSync !== false,

@@ -218,6 +218,22 @@ function renderOverlays() {
         ? `<div class="arch-header">${escapeHtml(overlay.name)}<span class="arch-header-stats">${status.header.checked}/${status.header.total != null ? status.header.total : '?'}${status.header.pct != null ? ` (${status.header.pct}%)` : ''}</span></div>`
         : '';
 
+      const feedItems = overlay.showItemFeed !== false && Array.isArray(status.items) ? status.items : [];
+      const feedHtml = feedItems.length
+        ? (() => {
+            const texts = feedItems.map(i => i.text || '');
+            const feedText = texts.map(escapeHtml).join(' &#8226; ');
+            return `
+        <div class="scroll-overlay arch-feed" id="arch-feed-${overlay.id}"
+          style="position: relative; width: 100%; overflow: hidden; white-space: nowrap; height: 1.4em; line-height: 1.4em; margin-top: 6px; font-size: 0.62em; opacity: 0.85;">
+          <div class="scroll-text" data-speed="1.5" data-randomize="false"
+            data-lines="${encodeURIComponent(JSON.stringify(texts))}"
+            data-separator="${encodeURIComponent(' • ')}">${feedText}</div>
+        </div>
+      `;
+          })()
+        : '';
+
       return `
       <div class="arch-overlay" id="arch-${overlay.id}"
         style="left:${overlay.position.x}px; top:${overlay.position.y}px; opacity:${overlay.opacity ?? 1}; background-color:${overlay.backgroundColor || 'transparent'}; row-gap:${overlay.rowGap ?? 8}px; font-size:${fontSize}px; color:${overlay.fontColor}; font-family:${overlay.font}; ${outlineStyle} --arch-game-size:${gameSize}px;">
@@ -225,6 +241,7 @@ function renderOverlays() {
         <div class="arch-rows">
           ${rows}
         </div>
+        ${feedHtml}
         <style>${overlay.customCSS || ''}</style>
       </div>
     `;

@@ -366,6 +366,7 @@ All modules share these features:
 - Two independent per-slot indicators:
   - **Status dot** = this tracker's own link to the room: connected (green) when our socket is authenticated, disconnected (red) while reconnecting, goal (gold) when the slot has reached its goal (from the `Goal` message or the authoritative `_read_client_status_<team>_<slot>` stored key), unknown (gray) when not running
   - **Player-online diamond** (left of the name) = whether the slot's *game* client is in the room: online (green) / offline (red) / unknown (gray). Derived from `Join`/`Part` broadcasts, ignoring tracker clients (`Join` filtered by tags, `Part` filtered by its "stopped tracking/viewing/hinting" text), since the server broadcasts these for every connection including our own tracker
+- **Item feed**: a scrolling line under the rows showing the last 5 item pops in the room (`Sender ➜ Receiver: Item`), fed from the server's `ItemSend` broadcasts with item names resolved via the per-game datapackage (fetched once on a designated feed connection); survives the 2s output-page refreshes by reusing the scroll-overlay marquee machinery
 - Per-slot visibility checkboxes, display-name override, game override, and current-slot radio (highlight + Twitch target)
 - Twitch category integration: per-slot category assignment with Twitch search, manual "Apply", and optional auto-set when the current slot changes while running (cached in `data/archipelago-games.json`)
 - Automatic reconnect with exponential backoff (base `reconnectDelay`, x2, cap 60s) + 60s watchdog that drops hidden slots and re-connects missing ones; seed-name comparison resets counts when the room changes
@@ -390,6 +391,7 @@ All modules share these features:
 | showPercent | boolean | true | Show completion percent |
 | showStatus | boolean | true | Show status dot (tracker link + goal) |
 | showPlayer | boolean | true | Show player-online indicator (diamond) |
+| showItemFeed | boolean | true | Show scrolling item-feed line under the rows (last 5 pops) |
 | highlightCurrent | boolean | true | Highlight the current slot row |
 | twitchSync | boolean | true | Auto-set Twitch category on current-slot change (while active) |
 | fontSize | number | 28 | Font size in pixels |
@@ -435,6 +437,7 @@ All modules share these features:
   "showPercent": true,
   "showStatus": true,
   "showPlayer": true,
+  "showItemFeed": true,
   "highlightCurrent": true,
   "twitchSync": true,
   "fontSize": 28,

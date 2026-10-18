@@ -13,6 +13,9 @@ const WS_TIMEOUT = 10000;
 const CLIENT_STATUS_GOAL = 30;
 const TRACKER_TAGS = new Set(['Tracker', 'TextOnly', 'HintGame']);
 const NON_GAME_PART = /stopped (tracking|viewing|hinting)/i;
+const ITEM_FEED_MAX = 5;
+const FEED_DEDUPE_WINDOW = 10000;
+const FEED_PRUNE_AGE = 60000;
 
 let ClientClass = null;
 async function getClient() {
@@ -87,6 +90,9 @@ class Runner {
     this.lastError = null;
     this.startedAt = null;
     this.lastRoomAt = null;
+    this.itemFeed = [];
+    this.feedSeen = new Map();
+    this.feedClient = null;
   }
 
   config() {
@@ -166,6 +172,9 @@ class Runner {
     this.inFlight.clear();
     this.tally.clear();
     this.slotRuntime.clear();
+    this.itemFeed = [];
+    this.feedSeen.clear();
+    this.feedClient = null;
     this.port = null;
     this.lastError = null;
   }
@@ -200,6 +209,10 @@ class Runner {
       client.socket.on('disconnected', () => {
         rt.online = false;
         rt.status = 'disconnected';
+        if (this.feedClient === client) {
+          this.feedClient = null;
+          if (!this.stopped) this.ensureFeedClient(null);
+        }
         if (this.stopped) return;
         this.scheduleReconnect(entry.slot);
       });
@@ -232,6 +245,12 @@ class Runner {
         goalRt.playerOnline = true;
       });
 
+      client.messages.on('itemSent', (_text, item) => {
+        if (this.stopped) return;
+        if (client !== this.feedClient) return;
+        this.captureFeed(item);
+      });
+
       client.room.on('locationsChecked', (checked) => {
         if (this.stopped) return;
         const list = checked || client.room.checkedLocations || [];
@@ -249,6 +268,7 @@ class Runner {
           slotData: false
         });
         this.attempts.set(entry.slot, 0);
+        this.ensureFeedClient(client);
       } catch (e) {
         try { client.socket.disconnect(); } catch (e2) {}
         this.clients.delete(entry.slot);
@@ -272,6 +292,8 @@ class Runner {
     const set = this.tallySet(entry.slot);
     if (rt.seed && seed && rt.seed !== seed) {
       set.clear();
+      this.itemFeed = [];
+      this.feedSeen.clear();
       rt.status = 'connected';
       rt.playerOnline = null;
     }
@@ -327,6 +349,42 @@ class Runner {
     set.add(loc);
     rt.checked = set.size;
     rt.lastCheckAt = Date.now();
+  }
+
+  ensureFeedClient(client) {
+    const current = this.feedClient;
+    if (current && current.authenticated) return;
+    let target = client && client.authenticated ? client : null;
+    if (!target) {
+      for (const c of this.clients.values()) {
+        if (c.authenticated) { target = c; break; }
+      }
+    }
+    if (!target) return;
+    this.feedClient = target;
+    target.package.fetchPackage().catch(() => {});
+  }
+
+  captureFeed(item) {
+    try {
+      const sender = item.sender;
+      const receiver = item.receiver;
+      const senderName = (sender && sender.name) || '???';
+      const receiverName = (receiver && receiver.name) || '???';
+      const itemName = item.name || `Item ${item.id}`;
+      const key = `${sender ? sender.slot : '?'}:${receiver ? receiver.slot : '?'}:${item.id}:${item.locationId}`;
+      const now = Date.now();
+      const last = this.feedSeen.get(key);
+      if (last && now - last < FEED_DEDUPE_WINDOW) return;
+      this.feedSeen.set(key, now);
+      if (this.feedSeen.size > 50) {
+        for (const [k, t] of this.feedSeen) {
+          if (now - t > FEED_PRUNE_AGE) this.feedSeen.delete(k);
+        }
+      }
+      this.itemFeed.unshift({ text: `${senderName} ➜ ${receiverName}: ${itemName}`, sender: senderName, receiver: receiverName, item: itemName, at: now });
+      if (this.itemFeed.length > ITEM_FEED_MAX) this.itemFeed.length = ITEM_FEED_MAX;
+    } catch (e) {}
   }
 
   scheduleReconnect(slot) {
@@ -448,6 +506,7 @@ class Runner {
       connectedCount: running ? [...this.clients.values()].filter(c => c.authenticated).length : 0,
       rowCount: rows.length,
       rows,
+      items: running ? this.itemFeed.slice() : [],
       header: {
         checked: checkedSum,
         total: totalSum,
@@ -520,6 +579,7 @@ function getStatus(overlay) {
     connectedCount: 0,
     rowCount: rows.length,
     rows,
+    items: [],
     header: { checked: 0, total: null, pct: null }
   };
 }

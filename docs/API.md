@@ -936,11 +936,14 @@ GET /api/archipelago/overlays/:id/status
     { "slot": 1, "name": "KhTest", "game": "Tunic", "current": true,
       "checked": 12, "total": 40, "pct": 30, "status": "connected", "online": true, "playerOnline": true }
   ],
-  "header": { "checked": 45, "total": 160, "pct": 28.1 }
+  "header": { "checked": 45, "total": 160, "pct": 28.1 },
+  "items": [
+    { "text": "Siddy ➜ Niiko: Master Sword", "sender": "Siddy", "receiver": "Niiko", "item": "Master Sword", "at": 1739840000000 }
+  ]
 }
 ```
 
-`checked`/`total`/`pct` are `null` until the slot's baseline is known (`'--'` on the overlay). `status` is the tracker-link state for that slot: `connected`, `disconnected`, `goal`, or `unknown`. `playerOnline` is `true`/`false`/`null` and reflects whether the slot's *game* client is in the room (independent of our tracker connection).
+`checked`/`total`/`pct` are `null` until the slot's baseline is known (`'--'` on the overlay). `status` is the tracker-link state for that slot: `connected`, `disconnected`, `goal`, or `unknown`. `playerOnline` is `true`/`false`/`null` and reflects whether the slot's *game* client is in the room (independent of our tracker connection). `items` is the list of the last 5 item pops in order (newest first) with sender/receiver/item and server timestamp `at`; `showItemFeed` controls whether the scrolling feed is rendered below the rows.
 
 ---
 
