@@ -186,6 +186,8 @@ function renderOverlays() {
       const status = tracker.getStatus(overlay);
       const fontSize = overlay.fontSize || 28;
       const gameSize = Math.max(10, Math.floor(fontSize * 0.62));
+      const width = parseInt(overlay.width, 10) > 0 ? parseInt(overlay.width, 10) : 0;
+      const widthStyle = width ? `width:${width}px; min-width:${width}px; max-width:${width}px;` : "";
 
       const rows = status.rows.map(row => {
         const checks = row.total != null ? `${row.checked ?? 0}/${row.total}` : '--';
@@ -236,7 +238,7 @@ function renderOverlays() {
 
       return `
       <div class="arch-overlay" id="arch-${overlay.id}"
-        style="left:${overlay.position.x}px; top:${overlay.position.y}px; opacity:${overlay.opacity ?? 1}; background-color:${overlay.backgroundColor || 'transparent'}; row-gap:${overlay.rowGap ?? 8}px; font-size:${fontSize}px; color:${overlay.fontColor}; font-family:${overlay.font}; ${outlineStyle} --arch-game-size:${gameSize}px;">
+        style="left:${overlay.position.x}px; top:${overlay.position.y}px; ${widthStyle} opacity:${overlay.opacity ?? 1}; background-color:${overlay.backgroundColor || 'transparent'}; row-gap:${overlay.rowGap ?? 8}px; font-size:${fontSize}px; color:${overlay.fontColor}; font-family:${overlay.font}; ${outlineStyle} --arch-game-size:${gameSize}px;">
         ${header}
         <div class="arch-rows">
           ${rows}

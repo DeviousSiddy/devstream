@@ -61,6 +61,7 @@ function defaultOverlay(body) {
     outlineColor: body.outlineColor || '#000000',
     outlineWidth: body.outlineWidth || 2,
     rowGap: body.rowGap ?? 8,
+    width: body.width || 0,
     customCSS: body.customCSS || '',
 
     createdAt: Date.now()

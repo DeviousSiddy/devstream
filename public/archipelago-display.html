@@ -232,7 +232,10 @@
         <label>Row Gap (px)</label>
         <input type="number" id="rowGap" value="8" min="0" max="40">
       </div>
-      <div></div>
+      <div>
+        <label>Width (px, 0 = auto)</label>
+        <input type="number" id="width" value="0" min="0" max="1920">
+      </div>
       <div></div>
     </div>
   </div>
@@ -405,6 +408,7 @@
       document.getElementById('showItemFeed').checked = overlay.showItemFeed !== false;
       document.getElementById('highlightCurrent').checked = overlay.highlightCurrent !== false;
       document.getElementById('rowGap').value = overlay.rowGap ?? 8;
+      document.getElementById('width').value = overlay.width || 0;
 
       document.getElementById('fontSize').value = overlay.fontSize || 28;
       document.getElementById('fontColor').value = overlay.fontColor || '#ffffff';
@@ -691,6 +695,7 @@
         showItemFeed: document.getElementById('showItemFeed').checked,
         highlightCurrent: document.getElementById('highlightCurrent').checked,
         rowGap: parseInt(document.getElementById('rowGap').value) || 0,
+        width: parseInt(document.getElementById('width').value) || 0,
         twitchSync: document.getElementById('twitchSync').checked,
         fontSize: parseInt(document.getElementById('fontSize').value) || 28,
         fontColor: document.getElementById('fontColor').value,
@@ -797,6 +802,8 @@
       const fontColor = document.getElementById('fontColor').value;
       const font = document.getElementById('font').value;
       const rowGap = parseInt(document.getElementById('rowGap').value) || 0;
+      const width = parseInt(document.getElementById('width').value) || 0;
+      const widthStyle = width ? 'width: ' + width + 'px; min-width: ' + width + 'px; max-width: ' + width + 'px;' : '';
       const gameSize = Math.max(10, Math.floor(fontSize * 0.62));
 
       const showHeader = document.getElementById('showHeader').checked;
@@ -867,7 +874,7 @@
         : '';
 
       preview.innerHTML = `
-        <div class="arch-overlay" style="background-color: ${bgColor}; opacity: ${opacity}; row-gap: ${rowGap}px; font-size: ${fontSize}px; color: ${fontColor}; font-family: ${font}; ${collectOutline()} --arch-game-size: ${gameSize}px;">
+        <div class="arch-overlay" style="background-color: ${bgColor}; ${widthStyle} opacity: ${opacity}; row-gap: ${rowGap}px; font-size: ${fontSize}px; color: ${fontColor}; font-family: ${font}; ${collectOutline()} --arch-game-size: ${gameSize}px;">
           ${headerHtml}
           <div class="arch-rows">
             ${rowsHtml || '<div style="color: #666;">No slots</div>'}
@@ -887,7 +894,7 @@
       if (e.key === 'Enter') searchTwitch();
     });
 
-    ['fontSize', 'fontColor', 'font', 'backgroundColor', 'opacity', 'bgTransparent', 'outlineEnabled', 'outlineColor', 'outlineWidth', 'rowGap', 'showHeader', 'showNumber', 'showGame', 'showChecks', 'showPercent', 'showStatus', 'showPlayer', 'showItemFeed', 'highlightCurrent'].forEach(id => {
+    ['fontSize', 'fontColor', 'font', 'backgroundColor', 'opacity', 'bgTransparent', 'outlineEnabled', 'outlineColor', 'outlineWidth', 'rowGap', 'width', 'showHeader', 'showNumber', 'showGame', 'showChecks', 'showPercent', 'showStatus', 'showPlayer', 'showItemFeed', 'highlightCurrent'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('input', renderPreview);
       if (el) el.addEventListener('change', renderPreview);
