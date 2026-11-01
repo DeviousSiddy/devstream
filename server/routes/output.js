@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { load } = require('../store');
+const tracker = require('../tracker');
 
 function escapeHtml(str) {
   return String(str)
@@ -172,7 +173,65 @@ function renderOverlays() {
     `;
   }).join('');
 
-  return textHtml + scrollHtml + godgamerHtml + canvasHtml;
+  const archipelagoHtml = (() => {
+    const archOverlays = load('archipelago-overlays').filter(o => o.isActive);
+    return archOverlays.map(overlay => {
+      let outlineStyle = '';
+      if (overlay.outlineEnabled) {
+        const w = overlay.outlineWidth || 2;
+        const c = overlay.outlineColor || '#000000';
+        outlineStyle = `text-shadow: -${w}px -${w}px 0 ${c}, ${w}px -${w}px 0 ${c}, -${w}px ${w}px 0 ${c}, ${w}px ${w}px 0 ${c};`;
+      }
+
+      const status = tracker.getStatus(overlay);
+      const fontSize = overlay.fontSize || 28;
+      const gameSize = Math.max(10, Math.floor(fontSize * 0.62));
+
+      const rows = status.rows.map(row => {
+        const checks = row.total != null ? `${row.checked ?? 0}/${row.total}` : '--';
+        const pct = row.pct != null ? `${row.pct}%` : '--';
+        const currentClass = overlay.highlightCurrent !== false && row.current ? ' arch-current' : '';
+        const playerState = row.playerOnline === true ? 'online' : row.playerOnline === false ? 'offline' : 'unknown';
+        const playerHtml = overlay.showPlayer !== false ? `<span class="arch-player arch-player-${playerState}"></span>` : '';
+        const nameHtml = `${overlay.showNumber !== false ? `<span class="arch-number">${row.slot}.</span>` : ''}${escapeHtml(row.name || row.serverName || `Slot ${row.slot}`)}`;
+        const gameHtml = overlay.showGame !== false && row.game
+          ? `<div class="arch-game">${escapeHtml(row.game)}</div>`
+          : '';
+        const rightHtml = [
+          overlay.showChecks !== false ? `<span class="arch-checks">${checks}</span>` : '',
+          overlay.showPercent !== false ? `<span class="arch-pct">${pct}</span>` : '',
+          overlay.showStatus !== false ? `<span class="arch-dot arch-dot-${row.status}"></span>` : ''
+        ].filter(Boolean).join('');
+
+        return `
+          <div class="arch-row${currentClass}">
+            <div class="arch-left">
+              <div class="arch-name">${playerHtml}${nameHtml}</div>
+              ${gameHtml}
+            </div>
+            <div class="arch-right">${rightHtml}</div>
+          </div>
+        `;
+      }).join('');
+
+      const header = overlay.showHeader !== false
+        ? `<div class="arch-header">${escapeHtml(overlay.name)}<span class="arch-header-stats">${status.header.checked}/${status.header.total != null ? status.header.total : '?'}${status.header.pct != null ? ` (${status.header.pct}%)` : ''}</span></div>`
+        : '';
+
+      return `
+      <div class="arch-overlay" id="arch-${overlay.id}"
+        style="left:${overlay.position.x}px; top:${overlay.position.y}px; opacity:${overlay.opacity ?? 1}; background-color:${overlay.backgroundColor || 'transparent'}; row-gap:${overlay.rowGap ?? 8}px; font-size:${fontSize}px; color:${overlay.fontColor}; font-family:${overlay.font}; ${outlineStyle} --arch-game-size:${gameSize}px;">
+        ${header}
+        <div class="arch-rows">
+          ${rows}
+        </div>
+        <style>${overlay.customCSS || ''}</style>
+      </div>
+    `;
+    }).join('');
+  })();
+
+  return textHtml + scrollHtml + godgamerHtml + canvasHtml + archipelagoHtml;
 }
 
 function formatDuration(seconds) {
@@ -307,6 +366,106 @@ router.get('/output', (req, res) => {
       font-size: 1.2em;
       white-space: pre-line;
     }
+    .arch-overlay {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      min-width: 340px;
+    }
+    .arch-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 15px;
+      font-weight: bold;
+      font-size: 1.15em;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.25);
+    }
+    .arch-header-stats {
+      font-size: 0.8em;
+      opacity: 0.85;
+    }
+    .arch-rows {
+      display: flex;
+      flex-direction: column;
+    }
+    .arch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.3);
+    }
+    .arch-row.arch-current {
+      background: rgba(77, 166, 255, 0.3);
+      border: 1px solid rgba(77, 166, 255, 0.5);
+    }
+    .arch-left {
+      min-width: 0;
+    }
+    .arch-name {
+      font-weight: bold;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .arch-number {
+      opacity: 0.7;
+      margin-right: 6px;
+    }
+    .arch-game {
+      font-size: var(--arch-game-size, 0.62em);
+      opacity: 0.75;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .arch-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .arch-pct {
+      min-width: 4.2em;
+      text-align: right;
+      opacity: 0.9;
+    }
+    .arch-checks {
+      opacity: 0.9;
+    }
+    .arch-dot {
+      width: 0.6em;
+      height: 0.6em;
+      border-radius: 50%;
+      background: #888;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .arch-dot.arch-dot-connected { background: #4dff4d; }
+    .arch-dot.arch-dot-goal { background: #ffd700; }
+    .arch-dot.arch-dot-disconnected { background: #ff4d4d; }
+    .arch-dot.arch-dot-unknown { background: #888; }
+    .arch-player {
+      width: 0.5em;
+      height: 0.5em;
+      display: inline-block;
+      border-radius: 2px;
+      margin-right: 0.4em;
+      vertical-align: middle;
+      background: #666;
+      flex-shrink: 0;
+      transform: rotate(45deg);
+    }
+    .arch-player.arch-player-online { background: #4dff4d; }
+    .arch-player.arch-player-offline { background: #ff6b6b; }
+    .arch-player.arch-player-unknown { background: #666; }
   </style>
 </head>
 <body>

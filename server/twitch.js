@@ -105,3 +105,22 @@ module.exports = {
   resolveCategory,
   setChannelCategory
 };
+
+
+async function sendChatMessage(message){
+  const token=getAccessToken();
+  if(!token){
+    const err=new Error('Twitch token not configured');
+    err.code='TWITCH_NOT_CONFIGURED';
+    throw err;
+  }
+  const broadcaster=await getBroadcaster();
+  await helixRequest('/chat/messages',{
+    method:'POST',
+    body:JSON.stringify({broadcaster_id:broadcaster.id,sender_id:broadcaster.id,message:message})
+  });
+  return true;
+}
+
+module.exports.sendChatMessage = sendChatMessage;
+

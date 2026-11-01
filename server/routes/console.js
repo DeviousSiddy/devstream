@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { load, save } = require('../store');
+const tracker = require('../tracker');
 
 function renderTextRow(overlay) {
   let status = 'Inactive';
@@ -96,6 +97,40 @@ function renderGodgamerRow(session) {
   `;
 }
 
+function renderArchipelagoRow(overlay) {
+  const status = tracker.getStatus(overlay);
+  let statusLabel = 'Idle';
+  let statusClass = '';
+  if (status.running) {
+    statusLabel = `Running (${status.connectedCount}/${status.rowCount} connected)`;
+    statusClass = status.connectedCount > 0 ? 'status-active' : 'status-expired';
+  }
+  const errorLine = status.lastError
+    ? `<div style="color: #ff6b6b; font-size: 12px;">${status.lastError}</div>`
+    : '';
+
+  let source = 'Not loaded';
+  if (overlay.roomId) {
+    let host = overlay.webhost || '';
+    try { host = new URL(overlay.webhost).host; } catch (e) {}
+    source = `${overlay.roomId} @ ${host}`;
+  }
+
+  return `
+    <tr>
+      <td>${overlay.name}</td>
+      <td>${source}<div style="color: #888; font-size: 12px;">${status.rowCount} visible slot${status.rowCount === 1 ? '' : 's'}</div></td>
+      <td class="${statusClass}">${statusLabel}${errorLine}</td>
+      <td>
+        <a href="/archipelago-display?id=${overlay.id}">Settings</a>
+        <button class="btn btn-sm" onclick="toggleArchipelagoOverlay('${overlay.id}', ${!overlay.isActive})">${overlay.isActive ? 'Stop' : 'Start'}</button>
+        <button class="btn btn-sm btn-secondary" onclick="duplicateArchipelagoOverlay('${overlay.id}')">Duplicate</button>
+        <button class="btn btn-sm btn-stop" onclick="deleteArchipelagoOverlay('${overlay.id}', '${overlay.name}')">Delete</button>
+      </td>
+    </tr>
+  `;
+}
+
 function renderCanvasRow(overlay) {
   let status = 'Inactive';
   let statusClass = '';
@@ -126,11 +161,13 @@ function renderConsole() {
   const scrollOverlays = load('scroll-overlays');
   const godgamerSessions = load('godgamer-sessions');
   const canvasOverlays = load('canvas-overlays');
+  const archipelagoOverlays = load('archipelago-overlays');
   
   const textRows = textOverlays.map(renderTextRow).join('');
   const scrollRows = scrollOverlays.map(renderScrollRow).join('');
   const godgamerRows = godgamerSessions.map(renderGodgamerRow).join('');
   const canvasRows = canvasOverlays.map(renderCanvasRow).join('');
+  const archipelagoRows = archipelagoOverlays.map(renderArchipelagoRow).join('');
 
   return `<!DOCTYPE html>
 <html>
@@ -195,6 +232,7 @@ function renderConsole() {
     <a href="/scroll-display" class="module-option">Scrolling Text</a>
     <a href="/godgamer-display" class="module-option">God Gamer Challenge</a>
     <a href="/canvas-display" class="module-option">Canvas Overlay</a>
+    <a href="/archipelago-display" class="module-option">Archipelago Tracker</a>
     <button class="btn btn-stop" onclick="hideModulePicker()" style="margin-left: 10px;">Cancel</button>
   </div>
 
@@ -246,6 +284,18 @@ function renderConsole() {
       </thead>
       <tbody id="canvasTable">
         ${canvasRows || '<tr><td colspan="4">No canvases yet</td></tr>'}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Archipelago Trackers</h2>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Source</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="archipelagoTable">
+        ${archipelagoRows || '<tr><td colspan="4">No trackers yet</td></tr>'}
       </tbody>
     </table>
   </div>
@@ -339,6 +389,26 @@ function renderConsole() {
       refreshConsole();
     }
 
+    async function toggleArchipelagoOverlay(id, activate) {
+      const endpoint = activate 
+        ? '/api/archipelago/overlays/' + id + '/start'
+        : '/api/archipelago/overlays/' + id + '/stop';
+      await fetch(endpoint, { method: 'POST' });
+      refreshConsole();
+    }
+
+    async function duplicateArchipelagoOverlay(id) {
+      const res = await fetch('/api/archipelago/overlays/' + id + '/duplicate', { method: 'POST' });
+      const newOverlay = await res.json();
+      window.location.href = '/archipelago-display?id=' + newOverlay.id;
+    }
+
+    async function deleteArchipelagoOverlay(id, name) {
+      if (!confirm('Delete "' + name + '"?')) return;
+      await fetch('/api/archipelago/overlays/' + id, { method: 'DELETE' });
+      refreshConsole();
+    }
+
     let botRunning = false;
 
     async function updateBotStatus() {
@@ -377,6 +447,7 @@ function renderConsole() {
         document.getElementById('scrollTable').innerHTML = data.scrollRows || '<tr><td colspan="4">No overlays yet</td></tr>';
         document.getElementById('godgamerTable').innerHTML = data.godgamerRows || '<tr><td colspan="5">No sessions yet</td></tr>';
         document.getElementById('canvasTable').innerHTML = data.canvasRows || '<tr><td colspan="4">No canvases yet</td></tr>';
+        document.getElementById('archipelagoTable').innerHTML = data.archipelagoRows || '<tr><td colspan="4">No trackers yet</td></tr>';
       } catch (e) {}
       updateBotStatus();
     }
@@ -396,13 +467,15 @@ router.get('/console/render', (req, res) => {
   const scrollOverlays = load('scroll-overlays');
   const godgamerSessions = load('godgamer-sessions');
   const canvasOverlays = load('canvas-overlays');
+  const archipelagoOverlays = load('archipelago-overlays');
   
   const textRows = textOverlays.map(renderTextRow).join('');
   const scrollRows = scrollOverlays.map(renderScrollRow).join('');
   const godgamerRows = godgamerSessions.map(renderGodgamerRow).join('');
   const canvasRows = canvasOverlays.map(renderCanvasRow).join('');
+  const archipelagoRows = archipelagoOverlays.map(renderArchipelagoRow).join('');
   
-  res.json({ textRows, scrollRows, godgamerRows, canvasRows });
+  res.json({ textRows, scrollRows, godgamerRows, canvasRows, archipelagoRows });
 });
 
 module.exports = router;
